@@ -136,7 +136,7 @@ function calculateGoldenHour(sunset: string, daylight_duration: number) {
 // type closest will return the closest value to the ratio
 function interpolate(start: number, end: number, ratio: number, type?: string) {
   if (type === "closest") {
-    if (ratio < 0.5) {
+    if (ratio <= 0.5) {
       return start;
     }
     return end;
