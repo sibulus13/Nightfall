@@ -21,12 +21,11 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
       );
       continue;
     }
-    let sunset_end_hourly_index = sunset_start_hourly_index + 1;
-    let interpolateRatio = Number(forecast.daily.sunset[i].slice(-2)) / 60;
-    let prediction = {
+    const sunset_end_hourly_index = sunset_start_hourly_index + 1;
+    const interpolateRatio = Number(forecast.daily.sunset[i].slice(-2)) / 60;
+    const prediction = {
       date: forecast.daily.time[i],
       // TODO: extrapolate to sunrise as well
-      // sunrise: forecast.daily.sunrise[i],
       start_time: startTime,
       sunset: forecast.daily.sunset[i],
       daylight_duration: forecast.daily.daylight_duration[i],
@@ -58,24 +57,6 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
           interpolateRatio,
         ),
       },
-      // cloud_cover_mid: {
-      //   start: forecast.hourly.cloud_cover_mid[sunset_start_hourly_index],
-      //   end: forecast.hourly.cloud_cover_mid[sunset_end_hourly_index],
-      //   interpolate: interpolate(
-      //     forecast.hourly.cloud_cover_mid[sunset_start_hourly_index],
-      //     forecast.hourly.cloud_cover_mid[sunset_end_hourly_index],
-      //     interpolateRatio
-      //   ),
-      // },
-      // cloud_cover_high: {
-      //   start: forecast.hourly.cloud_cover_high[sunset_start_hourly_index],
-      //   end: forecast.hourly.cloud_cover_high[sunset_end_hourly_index],
-      //   interpolate: interpolate(
-      //     forecast.hourly.cloud_cover_high[sunset_start_hourly_index],
-      //     forecast.hourly.cloud_cover_high[sunset_end_hourly_index],
-      //     interpolateRatio
-      //   ),
-      // },
       visibility: {
         start: forecast.hourly.visibility[sunset_start_hourly_index],
         end: forecast.hourly.visibility[sunset_end_hourly_index],
@@ -115,9 +96,6 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
     };
     predictions.push(res);
   }
-  // console.log(predictions);
-  // console.log(predictions.length);
-  // TODO calculate sunrise metric
   // TODO add Air Quality to calculation
   return predictions;
 }

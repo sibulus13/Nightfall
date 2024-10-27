@@ -58,9 +58,9 @@ export default async function Component() {
 
   return (
     <TooltipProvider>
-      <div className="container mx-auto p-4">
+      <div className="container p-4">
         <h1 className="mb-6 text-center text-3xl font-bold text-primary">
-          Sunset Prediction Dashboard
+          Nightfall
         </h1>
         <div className="group grid gap-4 md:grid-cols-3">
           {predictions.map((prediction) => (
