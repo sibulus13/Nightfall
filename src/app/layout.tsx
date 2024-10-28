@@ -5,9 +5,9 @@ import { type Metadata } from "next";
 import Navbar from "~/components/navbar";
 
 export const metadata: Metadata = {
-  title: "Sunset Dashboard",
-  description: "A dashboard for predicting sunset scores",
-  icons: [{ rel: "icon", url: "/favicon.ico" }],
+  title: "Nightfall | Sunset Quality Forecast",
+  description: "A dashboard for predicting weekly sunset quality",
+  icons: [{ rel: "icon", url: "/icon.ico" }],
 };
 
 export default function RootLayout({
