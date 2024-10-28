@@ -1,3 +1,6 @@
+"use client";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { calculateSunsetPredictions } from "~/lib/sunset/sunset";
 import { type WeatherForecast, type Prediction } from "~/lib/sunset/type";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -45,15 +48,28 @@ const truncateScore = (score: number, lowerLimit = 0, upperLimit = 93) => {
   return score.toFixed(0);
 };
 
-export default async function AppPage() {
-  const latitude = 49.1913033;
-  const longitude = -122.849143;
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
-  console.log(url);
-  const res = await fetch(url);
-  const forecast = (await res.json()) as WeatherForecast;
-  const predictions = calculateSunsetPredictions(forecast) as Prediction[];
-  console.log(predictions[0]);
+export default function AppPage() {
+  const searchParams = useSearchParams();
+  const lat = searchParams.get("lat");
+  const lng = searchParams.get("lng");
+  console.log(lat, lng, "lat, lng");
+
+  const latitude = lat;
+  const longitude = lng;
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+
+  async function getSunsetPrediction() {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
+    const res = await fetch(url);
+    const forecast = (await res.json()) as WeatherForecast;
+    const predictions = calculateSunsetPredictions(forecast) as Prediction[];
+    setPredictions(predictions);
+    console.log(predictions[0]);
+  }
+
+  useEffect(() => {
+    getSunsetPrediction();
+  }, [lat, lng]);
 
   return (
     <TooltipProvider>

@@ -96,7 +96,9 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
     };
     predictions.push(res);
   }
+
   // TODO add Air Quality to calculation
+  // TODO clean up results and remove unnecessary data
   return predictions;
 }
 
