@@ -1,10 +1,9 @@
-const Page = () => {
-    return (
-        <div>
-            <h1>API Documentation</h1>
-            <p>Welcome to the API documentation page.</p>
-        </div>
-    );
-};
-
-export default Page;
+export default function ApiPage() {
+  return (
+    <div>
+      <h1>Night Fall API</h1>
+      <h2>Coming Soon</h2>
+      {/* <p>The Night Fall API </p> */}
+    </div>
+  );
+}
