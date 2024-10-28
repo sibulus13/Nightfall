@@ -45,8 +45,7 @@ const truncateScore = (score: number, lowerLimit = 0, upperLimit = 93) => {
   return score.toFixed(0);
 };
 
-export default async function Component() {
-  // Removed: const [hoveredCard, setHoveredCard] = useState<string | null>(null)
+export default async function AppPage() {
   const latitude = 49.1913033;
   const longitude = -122.849143;
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
