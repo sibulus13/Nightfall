@@ -17,7 +17,7 @@ export default function RootLayout({
     <html lang="en" className={`${GeistSans.variable}`}>
       <body>
         <Navbar />
-        {children}
+        <div className="px-2">{children}</div>
       </body>
     </html>
   );

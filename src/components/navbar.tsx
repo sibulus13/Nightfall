@@ -8,7 +8,7 @@ const Navbar: React.FC = () => {
       <Link href="/">
         <div className="flex items-center">
           <Image src={"/favicon.png"} alt="favicon" width={50} height={50} />
-          <h1>Night Fall</h1>
+          <p>Night Fall</p>
         </div>
       </Link>
       <ul className="flex items-center justify-evenly gap-6">

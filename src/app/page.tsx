@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { APIProvider } from "@vis.gl/react-google-maps";
 import { useRouter } from "next/navigation";
 import { PlaceAutocomplete } from "~/components/autoComplete";
@@ -13,43 +13,47 @@ export default function MainPage() {
 
   useEffect(() => {
     if (selectedPlace) {
-      const lat = selectedPlace.geometry?.location.lat();
-      const lng = selectedPlace.geometry?.location.lng();
+      const lat = selectedPlace?.geometry?.location?.lat();
+      const lng = selectedPlace?.geometry?.location?.lng();
       Router.push("/App" + "?lat=" + lat + "&lng=" + lng);
     }
   }, [selectedPlace, Router]);
 
-  // const [selectedPlace, setSelectedPlace] =
-  //   useState<google.maps.places.PlaceResult | null>(null);
-
-  // const Router = useRouter();
-
-  // useEffect(() => {
-  //   if (selectedPlace) {
-  //     // console.log(selectedPlace.geometry?.location.lat());
-  //     // console.log(selectedPlace.geometry?.location.lng());
-
-  //     Router.push("/App", {
-  //       query: {
-  //         lat: selectedPlace.geometry?.location.lat(),
-  //         lng: selectedPlace.geometry?.location.lng(),
-  //       },
-  //     });
-  //   }
-  // }, [selectedPlace]);
-
   return (
-    <div className="flex-col">
-      <h1>Weekly Sunset Quality Forecast</h1>
+    <div className="flex flex-col items-center gap-10">
+      {/* Headline */}
+      <h1 className="text-3xl">
+        Weekly
+        <span className="">Sunset</span>
+        Quality Forecasts
+      </h1>
+      <p>Never miss another perfect sunset near you.</p>
       <br></br>
-      <APIProvider
-        apiKey={API_KEY}
-        // solutionChannel="GMP_devsite_samples_v3_rgmautocomplete"
-      >
+      <APIProvider apiKey={API_KEY}>
         <div className="autocomplete-control">
           <PlaceAutocomplete onPlaceSelect={setSelectedPlace} />
         </div>
       </APIProvider>
+
+      {/* Features */}
+      <div className="flex flex-col items-center">
+        <h2>Sunset Score</h2>
+        Nightfall provides location-based weekly sunset quality forecasts.
+        Providing a holisttic score to easily visualize the quality of the
+        sunset for the week in a single glance.
+      </div>
+      <div className="flex flex-col items-center">
+        <h2>Global Predictions</h2>
+        From Vancouver, Canada, to Sydney, Australia, Nightfall provides sunset
+        quality forecasts for locations around the world.
+      </div>
+      <div className="flex flex-col items-center">
+        <h2>For Photographers</h2>
+        Lighting is a key factor in photography. Nightfall provides the golden
+        hour duration as well as weather conditions to help photographers plan
+        their shoots. So you can capture the perfect moment without worrying
+        about getting wet.
+      </div>
     </div>
   );
 }
