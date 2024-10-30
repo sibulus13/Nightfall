@@ -3,7 +3,7 @@
 @tailwind utilities;
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 0 0% 80%;
     --foreground: 20 14.3% 4.1%;
     --card: 0 0% 100%;
     --card-foreground: 20 14.3% 4.1%;
@@ -64,7 +64,7 @@
     @apply bg-background text-foreground;
   }
   h1 {
-    @apply text-3xl font-bold;
+    @apply text-3xl font-extrabold;
   }
   h2 {
     @apply text-2xl font-bold;
