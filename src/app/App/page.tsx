@@ -52,7 +52,6 @@ export default function AppPage() {
   const searchParams = useSearchParams();
   const lat = searchParams.get("lat");
   const lng = searchParams.get("lng");
-  console.log(lat, lng, "lat, lng");
 
   const latitude = lat;
   const longitude = lng;
