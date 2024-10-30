@@ -7,8 +7,14 @@ const Navbar: React.FC = () => {
     <nav className="flex justify-between gap-6 p-2">
       <Link href="/">
         <div className="flex items-center">
-          <Image src={"/favicon.png"} alt="favicon" width={50} height={50} />
-          <p>Night Fall</p>
+          <Image
+            src={"/favicon.png"}
+            alt="favicon"
+            width={50}
+            height={50}
+            className="pb-2"
+          />
+          <p>Nightfall</p>
         </div>
       </Link>
       <ul className="flex items-center justify-evenly gap-6">
