@@ -7,7 +7,8 @@ import { CiSaveDown1 } from "react-icons/ci";
 import { GrScorecard } from "react-icons/gr";
 import { FcGlobe } from "react-icons/fc";
 import { FcOldTimeCamera } from "react-icons/fc";
-import Link from "next/link";
+import { scrollIntoTheView } from "~/lib/document";
+
 const API_KEY: string = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!;
 
 export default function MainPage() {
@@ -24,8 +25,8 @@ export default function MainPage() {
   }, [selectedPlace, Router]);
 
   return (
-    <div className="flex flex-col items-center gap-10">
-      <div className="-m-2 flex h-[calc(85vh)] flex-col bg-gradient-to-b from-transparent via-pink-300 to-transparent">
+    <div className="flex flex-col items-center gap-24">
+      <div className="-m-2 flex h-[calc(90vh)] flex-col bg-gradient-to-b from-transparent via-pink-300 to-transparent">
         {/* Headline */}
         <div className="flex grow flex-col items-center justify-center p-2">
           <h1 className="text-3xl">
@@ -44,16 +45,15 @@ export default function MainPage() {
             </div>
           </APIProvider>
         </div>
-        <Link
-          href="#features-section"
+        <button
+          onClick={() => scrollIntoTheView("features-section")}
           className="flex items-center justify-center"
         >
           <CiSaveDown1 className="h-12 w-12" />
-        </Link>
+        </button>
       </div>
       {/* Features */}
-      <div className="flex flex-col items-center">
-        <br id="features-section"></br>
+      <div className="flex flex-col items-center pt-10" id="features-section">
         <GrScorecard className="h-24 w-24" />
         <h2 className="mb-2 border-b p-1 pt-4">Sunset Score</h2>
         Nightfall provides location-based weekly sunset quality forecasts.
