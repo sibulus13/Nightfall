@@ -28,7 +28,7 @@ export default function MainPage() {
     <div className="flex flex-col items-center gap-24">
       <div className="-m-2 flex h-[calc(90vh)] flex-col bg-gradient-to-b from-transparent via-pink-300 to-transparent">
         {/* Headline */}
-        <div className="flex grow flex-col items-center justify-center p-2">
+        <div className="flex grow flex-col items-center justify-center p-6">
           <h1 className="text-3xl">
             Weekly
             <span className="bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">
@@ -69,12 +69,12 @@ export default function MainPage() {
       <div className="flex flex-col items-center">
         <FcOldTimeCamera className="h-24 w-24" />
         <h2 className="mb-2 border-b p-1">For Photographers</h2>
-        Lighting is a key factor in photography. Nightfall provides the golden
-        hour duration as well as weather conditions to help photographers plan
-        their shoots. So you can capture the perfect moment without worrying
-        about getting wet.
+        Lighting is a key factor in photography. Nightfall provides information
+        on each day&apos;s golden hour as well as weather condition to help
+        photographers plan their shoots, so you can always find the perfect
+        condition to capture the perfect moment!
       </div>
-      <br className="pt-20"></br>
+      <br></br>
     </div>
   );
 }

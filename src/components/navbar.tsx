@@ -4,7 +4,7 @@ import Link from "next/link";
 
 const Navbar: React.FC = () => {
   return (
-    <nav className="flex justify-between gap-6 p-2">
+    <nav className="flex justify-between gap-6 p-2 font-semibold">
       <Link href="/">
         <div className="flex items-center">
           <Image
@@ -14,7 +14,7 @@ const Navbar: React.FC = () => {
             height={50}
             className="pb-2"
           />
-          <p>Nightfall</p>
+          <p className="">Nightfall</p>
         </div>
       </Link>
       <ul className="flex items-center justify-evenly gap-6">
