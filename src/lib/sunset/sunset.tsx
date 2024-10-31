@@ -2,13 +2,11 @@ import { type WeatherForecast, type Prediction } from "~/lib/sunset/type";
 
 // Calculates the sunset predictions based on the forecast data
 export function calculateSunsetPredictions(forecast: WeatherForecast) {
-  // console.log(forecast);
   const predictions = [];
   const numberOfDays = forecast.daily?.time?.length ?? 0;
   // Get the sunset and sunrise times for each day
   for (let i = 0; i < numberOfDays; i++) {
-    const startTime: string = forecast.daily.sunset[i].slice(0, -2) + "00";
-    // console.log(startTime);
+    const startTime: string = forecast?.daily?.sunset[i]?.slice(0, -2) + "00";
     const sunset_start_hourly_index: number = forecast.hourly.time.findIndex(
       (time: string) => {
         return time === startTime;
@@ -22,7 +20,7 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
       continue;
     }
     const sunset_end_hourly_index = sunset_start_hourly_index + 1;
-    const interpolateRatio = Number(forecast.daily.sunset[i].slice(-2)) / 60;
+    const interpolateRatio = Number(forecast?.daily?.sunset[i]?.slice(-2)) / 60;
     const prediction = {
       date: forecast.daily.time[i],
       // TODO: extrapolate to sunrise as well
@@ -127,11 +125,8 @@ function interpolate(start: number, end: number, ratio: number, type?: string) {
 // Calculate the sunset score based on the prediction
 function calculateSunsetScore(prediction: Prediction) {
   let score = 1;
-  // calculate cloud coverage score
   const cCScore = cloudCoverageScore(prediction);
-  // calculate visibility score
   const vsScore = visibilityScore(prediction);
-  // calculate humidity score
   const hScore = humidityScore(prediction);
   // TODO calculate air quality score
   score *= 1;

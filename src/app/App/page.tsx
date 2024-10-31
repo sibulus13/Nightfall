@@ -53,8 +53,9 @@ export default function AppPage() {
   const lat = searchParams.get("lat");
   const lng = searchParams.get("lng");
 
-  const latitude = lat;
-  const longitude = lng;
+  const latitude = lat ?? localStorage.getItem("latitude");
+  const longitude = lng ?? localStorage.getItem("longitude");
+  console.log(latitude, longitude);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
 
   async function getSunsetPrediction() {
@@ -63,16 +64,17 @@ export default function AppPage() {
     const forecast = (await res.json()) as WeatherForecast;
     const predictions = calculateSunsetPredictions(forecast) as Prediction[];
     setPredictions(predictions);
-    console.log(predictions[0]);
   }
 
   useEffect(() => {
+    localStorage.setItem("latitude", latitude);
+    localStorage.setItem("longitude", longitude);
     getSunsetPrediction();
   }, [lat, lng]);
 
   return (
     <TooltipProvider>
-      <div className="container p-4">
+      <div className="container min-h-[calc(80vh)] p-4">
         <h1 className="mb-6 text-center text-3xl font-bold text-primary">
           Nightfall
         </h1>
