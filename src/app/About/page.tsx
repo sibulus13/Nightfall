@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const AboutPage = () => {
   return (
     <div className="page gap-10">
@@ -85,7 +87,7 @@ const AboutPage = () => {
           <li>
             - Real-Time Updates: Conditions and predictions updated continuously
           </li>
-          <li>- Location Precision: Accurate to your exact viewing position</li>
+          <li>- Location Precision: Accurate to your local city</li>
           <li>
             - Weather Integration: Powered by Open Meteo for reliable
             forecasting
@@ -99,7 +101,13 @@ const AboutPage = () => {
         <h2>Contact Us</h2>
         <p>
           Have questions, suggestions, or just want to share your perfect sunset
-          shot? Reach out to us at chengjie.michael.huang@gmail.com
+          shot? Reach out to us at{" "}
+          <Link
+            href="mailto:chengjie.michael.huang@gmail.com"
+            className="underline"
+          >
+            chengjie.michael.huang@gmail.com
+          </Link>
         </p>
         <p className="pt-4">
           &quot;Every sunset brings the promise of a new dawn&quot; - Ralph
