@@ -52,24 +52,28 @@ export default function AppPage() {
   const searchParams = useSearchParams();
   const lat = searchParams.get("lat");
   const lng = searchParams.get("lng");
-
   const latitude = lat ?? localStorage.getItem("latitude");
   const longitude = lng ?? localStorage.getItem("longitude");
-  console.log(latitude, longitude);
+  // console.log(latitude, longitude);
+
   const [predictions, setPredictions] = useState<Prediction[]>([]);
 
   async function getSunsetPrediction() {
+    if (!latitude || !longitude) {
+      return;
+    }
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
     const res = await fetch(url);
     const forecast = (await res.json()) as WeatherForecast;
     const predictions = calculateSunsetPredictions(forecast) as Prediction[];
+    // console.log(predictions[0]);
     setPredictions(predictions);
   }
 
   useEffect(() => {
+    getSunsetPrediction();
     localStorage.setItem("latitude", latitude);
     localStorage.setItem("longitude", longitude);
-    getSunsetPrediction();
   }, [lat, lng]);
 
   return (
@@ -106,7 +110,7 @@ export default function AppPage() {
                       <div className="flex items-center space-x-1">
                         <Clock className="h-4 w-4 text-primary" />
                         <span className="text-xs">
-                          {formatTime(prediction.sunset)}
+                          {formatTime(prediction.sunset + "Z")}
                         </span>
                       </div>
                     </TooltipTrigger>
@@ -120,7 +124,7 @@ export default function AppPage() {
                         <Hourglass className="h-4 w-4 text-primary" />
                         <span className="text-xs">
                           {formatTime(prediction.golden_hour.start)} -{" "}
-                          {formatTime(prediction.golden_hour.end)}
+                          {formatTime(prediction.golden_hour.end + "Z")}
                         </span>
                       </div>
                     </TooltipTrigger>
