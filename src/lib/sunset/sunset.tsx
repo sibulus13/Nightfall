@@ -83,9 +83,9 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
           "closest",
         ),
       },
-      weather_condition: getWeatherCondition(
-        forecast.hourly.weather_code[sunset_start_hourly_index],
-      ),
+      // weather_condition: getWeatherCondition(
+      //   forecast.hourly.weather_code[sunset_start_hourly_index],
+      // ),
     };
     const sunsetScore = calculateSunsetScore(prediction);
     const res = {
@@ -203,62 +203,4 @@ function cloudCoverageScore(prediction: Prediction) {
   }
 
   return score;
-}
-
-function getWeatherCondition(weatherCode: number) {
-  // TODO specifiy weather conditions based on switch statement
-  switch (weatherCode) {
-    case 0:
-      return "Clear sky";
-    case 1:
-      return "Mainly clear sky";
-    case 2:
-      return "Partly cloudy";
-    case 3:
-      return "Mainly cloudy";
-    case 45:
-      return "Fog or ice fog";
-    case 48:
-      return "depositing rime fog";
-    case 51:
-      return "Light Drizzle";
-    case 53:
-      return "Moderate drizzle";
-    case 55:
-      return "Heavy drizzle";
-    case 56:
-      return "Freezing drizzle: Light intensity";
-    case 57:
-      return "Freezing drizzle: Moderate or heavy intensity";
-    case 61:
-      return "Light rain";
-    case 63:
-      return "Moderate rain";
-    case 65:
-      return "Heavy rain";
-    case 66:
-      return "Freezing rain: Light intensity";
-    case 67:
-      return "Freezing rain: Moderate or heavy intensity";
-    case 71:
-    case 73:
-    case 75:
-      return "Snow fall: Slight, moderate, and heavy intensity";
-    case 77:
-      return "Snow grains";
-    case 80:
-    case 81:
-    case 82:
-      return "Rain showers: Slight, moderate, and violent";
-    case 85:
-    case 86:
-      return "Snow showers slight and heavy";
-    case 95:
-      return "Thunderstorm: Slight or moderate";
-    case 96:
-    case 99:
-      return "Thunderstorm with slight and heavy hail";
-    default:
-      return "Unknown weather condition";
-  }
 }

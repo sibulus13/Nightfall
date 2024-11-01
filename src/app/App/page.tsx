@@ -4,13 +4,16 @@ import { useSearchParams } from "next/navigation";
 import { calculateSunsetPredictions } from "~/lib/sunset/sunset";
 import { type WeatherForecast, type Prediction } from "~/lib/sunset/type";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Sun, Clock, Hourglass } from "lucide-react";
+import { Hourglass } from "lucide-react";
+import { BsSunset } from "react-icons/bs";
+import { TbSunset2 } from "react-icons/tb";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import WeatherDisplay from "~/components/weatherDisplay";
 
 const getScoreGradient = (score: number) => {
   const baseColors = ["from-orange-300 via-pink-400 to-purple-500"];
@@ -66,7 +69,7 @@ export default function AppPage() {
     const res = await fetch(url);
     const forecast = (await res.json()) as WeatherForecast;
     const predictions = calculateSunsetPredictions(forecast) as Prediction[];
-    // console.log(predictions[0]);
+    console.log(predictions[0]);
     setPredictions(predictions);
   }
 
@@ -93,23 +96,27 @@ export default function AppPage() {
             >
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-semibold">
-                  {formatDate(prediction.date)}
+                  {formatDate(prediction.sunset + "Z")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col justify-between">
-                <div className="flex flex-col items-center">
-                  <Sun className="mb-2 h-12 w-12 text-yellow-500" />
-                  <span className="text-4xl font-bold">
-                    {truncateScore(prediction.score.score)}
-                  </span>
-                  {/* <span className="text-sm font-medium">Sunset Score</span> */}
+                <div className="flex items-center justify-between">
+                  <WeatherDisplay
+                    weatherCode={prediction.weather_code.interpolate}
+                  />
+                  <div className="flex items-center justify-center">
+                    <TbSunset2 className="mb-2 h-12 w-12 text-yellow-300" />
+                    <span className="text-4xl font-bold">
+                      {truncateScore(prediction.score.score) + "%"}
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-4 flex flex-col items-end">
+                <div className="mt-2 flex flex-col items-end gap-1">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="flex items-center space-x-1">
-                        <Clock className="h-4 w-4 text-primary" />
-                        <span className="text-xs">
+                        <BsSunset className="h-6 w-6 text-orange-300" />
+                        <span className="text-sm">
                           {formatTime(prediction.sunset + "Z")}
                         </span>
                       </div>
@@ -121,8 +128,8 @@ export default function AppPage() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="flex items-center space-x-1">
-                        <Hourglass className="h-4 w-4 text-primary" />
-                        <span className="text-xs">
+                        <Hourglass className="h-6 w-6 text-yellow-300" />
+                        <span className="text-sm">
                           {formatTime(prediction.golden_hour.start)} -{" "}
                           {formatTime(prediction.golden_hour.end + "Z")}
                         </span>
