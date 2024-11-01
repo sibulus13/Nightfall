@@ -26,9 +26,11 @@ export default function WeatherDisplay({
     // TODO why is the tool tip text not showing?
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>{weather.icon}</TooltipTrigger>
+        <TooltipTrigger asChild>
+          <div>{weather.icon}</div>
+        </TooltipTrigger>
         <TooltipContent>
-          <p>{weather.text + "test"}</p>
+          <p>{weather.text}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

@@ -81,10 +81,7 @@ export default function AppPage() {
 
   return (
     <TooltipProvider>
-      <div className="page">
-        <h1 className="mb-6 text-center text-3xl font-bold text-primary">
-          Nightfall
-        </h1>
+      <div className="page justify-center">
         <div className="group grid gap-4 md:grid-cols-3">
           {predictions.map((prediction) => (
             <Card
