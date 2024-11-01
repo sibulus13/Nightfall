@@ -58,7 +58,7 @@
 }
 @layer base {
   * {
-    @apply border-black border-border scroll-smooth;
+    @apply scroll-smooth border-black border-border;
   }
   body {
     @apply bg-background text-foreground;
@@ -67,6 +67,16 @@
     @apply text-3xl font-extrabold;
   }
   h2 {
-    @apply text-2xl font-bold;
+    @apply pb-2 text-2xl font-bold;
+  }
+
+  h3 {
+    @apply pb-2 text-xl font-semibold;
+  }
+}
+
+@layer utilities {
+  .page {
+    @apply flex min-h-[calc(80vh)] flex-col px-4;
   }
 }

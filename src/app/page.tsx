@@ -25,7 +25,7 @@ export default function MainPage() {
   }, [selectedPlace, Router]);
 
   return (
-    <div className="flex flex-col items-center gap-24">
+    <div className="page -mx-4 items-center gap-24">
       <div className="-m-2 flex h-[calc(90vh)] flex-col bg-gradient-to-b from-transparent via-pink-300 to-transparent">
         {/* Headline */}
         <div className="flex grow flex-col items-center justify-center p-6">

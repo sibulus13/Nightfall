@@ -74,7 +74,7 @@ export default function AppPage() {
 
   return (
     <TooltipProvider>
-      <div className="container min-h-[calc(80vh)] p-4">
+      <div className="page">
         <h1 className="mb-6 text-center text-3xl font-bold text-primary">
           Nightfall
         </h1>
