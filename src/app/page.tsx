@@ -8,21 +8,33 @@ import { GrScorecard } from "react-icons/gr";
 import { FcGlobe } from "react-icons/fc";
 import { FcOldTimeCamera } from "react-icons/fc";
 import { scrollIntoTheView } from "~/lib/document";
-
+import { FaLocationCrosshairs } from "react-icons/fa6";
 const API_KEY: string = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!;
 
 export default function MainPage() {
+  function handleLocationClick() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        setLat(position.coords.latitude);
+        setLng(position.coords.longitude);
+      });
+    } else {
+      alert("Geolocation is not supported by this browser.");
+    }
+  }
   const Router = useRouter();
   const [selectedPlace, setSelectedPlace] =
     useState<google.maps.places.PlaceResult | null>(null);
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
 
   useEffect(() => {
-    if (selectedPlace) {
-      const lat = selectedPlace?.geometry?.location?.lat();
-      const lng = selectedPlace?.geometry?.location?.lng();
-      Router.push("/App" + "?lat=" + lat + "&lng=" + lng);
+    if (selectedPlace || (lat && lng)) {
+      const latitude = lat ?? selectedPlace?.geometry?.location?.lat();
+      const longitude = lng ?? selectedPlace?.geometry?.location?.lng();
+      Router.push("/App" + "?lat=" + latitude + "&lng=" + longitude);
     }
-  }, [selectedPlace, Router]);
+  }, [selectedPlace, Router, lat, lng]);
 
   return (
     <div className="page -mx-4 items-center gap-24">
@@ -40,8 +52,11 @@ export default function MainPage() {
           <p>Never miss another perfect sunset near you.</p>
           <br></br>
           <APIProvider apiKey={API_KEY}>
-            <div className="autocomplete-control">
+            <div className="flex gap-2">
               <PlaceAutocomplete onPlaceSelect={setSelectedPlace} />
+              <button onClick={handleLocationClick}>
+                <FaLocationCrosshairs className="h-10 w-10" />
+              </button>
             </div>
           </APIProvider>
         </div>

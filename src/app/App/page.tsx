@@ -57,8 +57,6 @@ export default function AppPage() {
   const lng = searchParams.get("lng");
   const latitude = lat ?? localStorage.getItem("latitude");
   const longitude = lng ?? localStorage.getItem("longitude");
-  // console.log(latitude, longitude);
-
   const [predictions, setPredictions] = useState<Prediction[]>([]);
 
   async function getSunsetPrediction() {
@@ -108,7 +106,21 @@ export default function AppPage() {
                     </span>
                   </div>
                 </div>
-                <div className="mt-2 flex flex-col items-end gap-1">
+                <div className="flex justify-center gap-1 pt-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center space-x-1">
+                        <Hourglass className="h-6 w-6 text-yellow-300" />
+                        <span className="text-sm">
+                          {formatTime(prediction.golden_hour.start)}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Golden Hour Start</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  -
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="flex items-center space-x-1">
@@ -120,20 +132,6 @@ export default function AppPage() {
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Sunset Time</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center space-x-1">
-                        <Hourglass className="h-6 w-6 text-yellow-300" />
-                        <span className="text-sm">
-                          {formatTime(prediction.golden_hour.start)} -{" "}
-                          {formatTime(prediction.golden_hour.end + "Z")}
-                        </span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Golden Hour</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>

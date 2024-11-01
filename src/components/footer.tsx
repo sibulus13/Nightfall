@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function Footer() {
   return (
     <footer className="mx-2 flex justify-center border-t p-2">
-      <p>© 2021 Nightfall</p>
+      <p>© 2024 Nightfall</p>
       <div>
         <Link className="mx-2 underline" href="/Privacy">
           Privacy

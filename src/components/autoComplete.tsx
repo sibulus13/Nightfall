@@ -34,7 +34,7 @@ export const PlaceAutocomplete = ({
   }, [onPlaceSelect, placeAutocomplete]);
 
   return (
-    <div className="autocomplete-container rounded-2xl border-2 border-black p-2">
+    <div className="rounded-2xl border-2 border-black p-2">
       <input
         ref={inputRef}
         placeholder="Enter location"
