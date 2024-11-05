@@ -5,6 +5,7 @@ import { type Metadata } from "next";
 import Navbar from "~/components/navbar";
 import Footer from "~/components/footer";
 import { ThemeProvider } from "~/components/themeProvider";
+import StoreProvider from "./StoreProvider";
 
 export const metadata: Metadata = {
   title: "Nightfall | Sunset Quality Forecast",
@@ -24,9 +25,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Navbar />
-          {children}
-          <Footer />
+          <StoreProvider>
+            <Navbar />
+            {children}
+            <Footer />
+          </StoreProvider>
         </ThemeProvider>
       </body>
     </html>

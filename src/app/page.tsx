@@ -7,31 +7,48 @@ import { FcGlobe } from "react-icons/fc";
 import { FcOldTimeCamera } from "react-icons/fc";
 import { scrollIntoTheView } from "~/lib/document";
 import Locator from "~/components/locator";
+import { useDispatch } from "react-redux";
+import { Place } from "~/types/location";
 
 export default function MainPage() {
-  function handleLocationClick() {
+  function setPlace(place: Place) {
+    const lat = place?.geometry?.location?.lat();
+    const lon = place?.geometry?.location?.lng();
+    dispatch({
+      type: "location/setLocation",
+      payload: {
+        lat: lat,
+        lon: lon,
+      },
+    });
+    localStorage.setItem("lat", lat);
+    localStorage.setItem("lon", lon);
+    Router.push("/App");
+  }
+
+  function setUserLocation() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
-        setLat(position.coords.latitude);
-        setLng(position.coords.longitude);
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        dispatch({
+          type: "location/setLocation",
+          payload: {
+            lat: lat,
+            lon: lon,
+          },
+        });
+        localStorage.setItem("lat", lat);
+        localStorage.setItem("lon", lon);
+        Router.push("/App");
       });
     } else {
       alert("Geolocation is not supported by this browser.");
     }
   }
-  const Router = useRouter();
-  const [selectedPlace, setSelectedPlace] =
-    useState<google.maps.places.PlaceResult | null>(null);
-  const [lat, setLat] = useState<number | null>(null);
-  const [lng, setLng] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (selectedPlace || (lat && lng)) {
-      const latitude = lat ?? selectedPlace?.geometry?.location?.lat();
-      const longitude = lng ?? selectedPlace?.geometry?.location?.lng();
-      Router.push("/App" + "?lat=" + latitude + "&lng=" + longitude);
-    }
-  }, [selectedPlace, Router, lat, lng]);
+  const Router = useRouter();
+  const dispatch = useDispatch();
 
   return (
     <div className="page items-center gap-24">
@@ -49,8 +66,8 @@ export default function MainPage() {
           <p>Never miss another perfect sunset near you.</p>
           <br></br>
           <Locator
-            setSelectedPlace={setSelectedPlace}
-            handleLocationClick={handleLocationClick}
+            setSelectedPlace={setPlace}
+            handleLocationClick={setUserLocation}
           />
         </div>
         <button

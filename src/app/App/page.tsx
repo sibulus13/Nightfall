@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { calculateSunsetPredictions } from "~/lib/sunset/sunset";
 import { type WeatherForecast, type Prediction } from "~/lib/sunset/type";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -15,6 +14,8 @@ import {
 } from "~/components/ui/tooltip";
 import WeatherDisplay from "~/components/weatherDisplay";
 import Locator from "~/components/locator";
+import { useSelector, useDispatch } from "react-redux";
+import { Location, Place } from "~/types/location";
 
 const getScoreGradient = (score: number) => {
   const baseColors = ["from-orange-300 via-pink-400 to-purple-500"];
@@ -52,29 +53,47 @@ const truncateScore = (score: number, lowerLimit = 0, upperLimit = 93) => {
 };
 
 export default function AppPage() {
-  function handleLocationClick() {
+  function setPlace(place: Place) {
+    const lat = place?.geometry?.location?.lat();
+    const lon = place?.geometry?.location?.lng();
+    dispatch({
+      type: "location/setLocation",
+      payload: {
+        lat: lat,
+        lon: lon,
+      },
+    });
+    localStorage.setItem("lat", lat);
+    localStorage.setItem("lon", lon);
+  }
+
+  function setUserLocation() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
-        setLatitude(position.coords.latitude);
-        setLongitude(position.coords.longitude);
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        dispatch({
+          type: "location/setLocation",
+          payload: {
+            lat: lat,
+            lon: lon,
+          },
+        });
+        localStorage.setItem("lat", lat);
+        localStorage.setItem("lon", lon);
       });
     } else {
       alert("Geolocation is not supported by this browser.");
     }
   }
 
-  const searchParams = useSearchParams();
-  const lat = searchParams.get("lat");
-  const lng = searchParams.get("lng");
-  const [latitude, setLatitude] = useState<string | null>(
-    lat ?? localStorage.getItem("latitude"),
+  const dispatch = useDispatch();
+  const location = useSelector(
+    (state: { location: Location }) => state.location,
   );
-  const [longitude, setLongitude] = useState<string | null>(
-    lng ?? localStorage.getItem("longitude"),
-  );
+  const latitude = location.location.lat;
+  const longitude = location.location.lon;
   const [predictions, setPredictions] = useState<Prediction[]>([]);
-  const [selectedPlace, setSelectedPlace] =
-    useState<google.maps.places.PlaceResult | null>(null);
 
   async function getSunsetPrediction() {
     if (!latitude || !longitude) {
@@ -84,23 +103,23 @@ export default function AppPage() {
     const res = await fetch(url);
     const forecast = (await res.json()) as WeatherForecast;
     const predictions = calculateSunsetPredictions(forecast) as Prediction[];
-    // console.log(predictions[0]);
     setPredictions(predictions);
+    dispatch({
+      type: "location/resetLocation",
+    });
   }
 
   useEffect(() => {
     getSunsetPrediction();
-    localStorage.setItem("latitude", latitude);
-    localStorage.setItem("longitude", longitude);
-  }, [latitude, longitude, selectedPlace]);
+  }, [latitude, longitude]);
 
   return (
     <TooltipProvider>
       <div className="page justify-center">
         <div className="flex gap-2 p-2 py-4">
           <Locator
-            setSelectedPlace={setSelectedPlace}
-            handleLocationClick={handleLocationClick}
+            setSelectedPlace={setPlace}
+            handleLocationClick={setUserLocation}
           />
         </div>
 
