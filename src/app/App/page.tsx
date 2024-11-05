@@ -22,7 +22,6 @@ const getScoreGradient = (score: number) => {
 };
 
 const formatTime = (timeString: string) => {
-  // TODO: Use the user's locale to format the time
   return new Date(timeString).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
@@ -80,7 +79,7 @@ export default function AppPage() {
   return (
     <TooltipProvider>
       <div className="page justify-center">
-        <div className="group grid gap-4 md:grid-cols-3">
+        <div className="group grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {predictions.map((prediction) => (
             <Card
               key={prediction.date}
