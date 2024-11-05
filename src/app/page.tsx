@@ -1,15 +1,12 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { APIProvider } from "@vis.gl/react-google-maps";
 import { useRouter } from "next/navigation";
-import { PlaceAutocomplete } from "~/components/autoComplete";
 import { CiSaveDown1 } from "react-icons/ci";
 import { GrScorecard } from "react-icons/gr";
 import { FcGlobe } from "react-icons/fc";
 import { FcOldTimeCamera } from "react-icons/fc";
 import { scrollIntoTheView } from "~/lib/document";
-import { FaLocationCrosshairs } from "react-icons/fa6";
-const API_KEY: string = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!;
+import Locator from "~/components/locator";
 
 export default function MainPage() {
   function handleLocationClick() {
@@ -51,14 +48,10 @@ export default function MainPage() {
           </h1>
           <p>Never miss another perfect sunset near you.</p>
           <br></br>
-          <APIProvider apiKey={API_KEY}>
-            <div className="flex gap-2">
-              <PlaceAutocomplete onPlaceSelect={setSelectedPlace} />
-              <button onClick={handleLocationClick}>
-                <FaLocationCrosshairs className="h-10 w-10" />
-              </button>
-            </div>
-          </APIProvider>
+          <Locator
+            setSelectedPlace={setSelectedPlace}
+            handleLocationClick={handleLocationClick}
+          />
         </div>
         <button
           onClick={() => scrollIntoTheView("features-section")}
