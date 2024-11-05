@@ -1,10 +1,11 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { ModeToggle } from "./darkModeToggle";
 
 const Navbar: React.FC = () => {
   return (
-    <nav className="flex justify-between gap-6 p-2 font-semibold">
+    <nav className="flex justify-between gap-2 p-2 font-semibold">
       <Link href="/">
         <div className="flex items-center">
           <Image
@@ -17,7 +18,7 @@ const Navbar: React.FC = () => {
           <p className="">Nightfall</p>
         </div>
       </Link>
-      <ul className="flex items-center justify-evenly gap-6">
+      <ul className="flex items-center justify-evenly gap-2">
         <li>
           <Link href="/App">App</Link>
         </li>
@@ -26,6 +27,9 @@ const Navbar: React.FC = () => {
         </li>
         <li>
           <Link href="/About">About</Link>
+        </li>
+        <li>
+          <ModeToggle />
         </li>
       </ul>
     </nav>

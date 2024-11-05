@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans";
 import { type Metadata } from "next";
 import Navbar from "~/components/navbar";
 import Footer from "~/components/footer";
+import { ThemeProvider } from "~/components/themeProvider";
 
 export const metadata: Metadata = {
   title: "Nightfall | Sunset Quality Forecast",
@@ -17,9 +18,16 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.variable}`}>
       <body>
-        <Navbar />
-        <div className="m-2">{children}</div>
-        <Footer />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Navbar />
+          <div className="m-2">{children}</div>
+          <Footer />
+        </ThemeProvider>
       </body>
     </html>
   );
