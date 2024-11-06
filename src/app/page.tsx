@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import { CiSaveDown1 } from "react-icons/ci";
 import { GrScorecard } from "react-icons/gr";
@@ -9,46 +9,40 @@ import { scrollIntoTheView } from "~/lib/document";
 import Locator from "~/components/locator";
 import { useDispatch } from "react-redux";
 import { Place } from "~/types/location";
+import { getSunsetPrediction } from "~/lib/sunset/sunset";
 
 export default function MainPage() {
-  function setPlace(place: Place) {
-    const lat = place?.geometry?.location?.lat();
-    const lon = place?.geometry?.location?.lng();
+  const Router = useRouter();
+  const dispatch = useDispatch();
+
+  async function predict(lat: Number, lon: Number) {
+    localStorage.setItem("lat", lat.toString());
+    localStorage.setItem("lon", lon.toString());
+    const predictions = await getSunsetPrediction(lat, lon);
     dispatch({
-      type: "location/setLocation",
-      payload: {
-        lat: lat,
-        lon: lon,
-      },
+      type: "prediction/setPrediction",
+      payload: predictions,
     });
-    localStorage.setItem("lat", lat);
-    localStorage.setItem("lon", lon);
     Router.push("/App");
   }
 
-  function setUserLocation() {
+  async function setPlace(place: Place) {
+    const lat = place?.geometry?.location?.lat();
+    const lon = place?.geometry?.location?.lng();
+    await predict(lat, lon);
+  }
+
+  async function setUserLocation() {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
+      navigator.geolocation.getCurrentPosition(async (position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
-        dispatch({
-          type: "location/setLocation",
-          payload: {
-            lat: lat,
-            lon: lon,
-          },
-        });
-        localStorage.setItem("lat", lat);
-        localStorage.setItem("lon", lon);
-        Router.push("/App");
+        await predict(lat, lon);
       });
     } else {
       alert("Geolocation is not supported by this browser.");
     }
   }
-
-  const Router = useRouter();
-  const dispatch = useDispatch();
 
   return (
     <div className="page items-center gap-24">

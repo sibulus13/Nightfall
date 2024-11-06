@@ -1,9 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit'
-import locationReducer from './location/locationSlice'
+import predictionReducer from './prediction/predictionSlice'
 
 export const makeStore = () => {
   return configureStore({
-    reducer: { location: locationReducer }
+    reducer: {
+      prediction: predictionReducer,
+    }
   })
 }
 

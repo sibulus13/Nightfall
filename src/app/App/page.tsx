@@ -1,7 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { calculateSunsetPredictions } from "~/lib/sunset/sunset";
-import { type WeatherForecast, type Prediction } from "~/lib/sunset/type";
+import { useEffect } from "react";
+import { type Prediction } from "~/lib/sunset/type";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Hourglass } from "lucide-react";
 import { BsSunset } from "react-icons/bs";
@@ -15,7 +14,8 @@ import {
 import WeatherDisplay from "~/components/weatherDisplay";
 import Locator from "~/components/locator";
 import { useSelector, useDispatch } from "react-redux";
-import { Location, Place } from "~/types/location";
+import { type Place } from "~/types/location";
+import { getSunsetPrediction } from "~/lib/sunset/sunset";
 
 const getScoreGradient = (score: number) => {
   const baseColors = ["from-orange-300 via-pink-400 to-purple-500"];
@@ -53,65 +53,48 @@ const truncateScore = (score: number, lowerLimit = 0, upperLimit = 93) => {
 };
 
 export default function AppPage() {
-  function setPlace(place: Place) {
+  const dispatch = useDispatch();
+  const prediction = useSelector(
+    (state: { prediction: { prediction: Prediction[] } }) =>
+      state.prediction.prediction,
+  );
+
+  async function predict(lat: Number, lon: Number) {
+    localStorage.setItem("lat", lat.toString());
+    localStorage.setItem("lon", lon.toString());
+    const predictions = await getSunsetPrediction(lat, lon);
+    dispatch({
+      type: "prediction/setPrediction",
+      payload: predictions,
+    });
+  }
+  async function setPlace(place: Place) {
     const lat = place?.geometry?.location?.lat();
     const lon = place?.geometry?.location?.lng();
-    dispatch({
-      type: "location/setLocation",
-      payload: {
-        lat: lat,
-        lon: lon,
-      },
-    });
-    localStorage.setItem("lat", lat);
-    localStorage.setItem("lon", lon);
+    await predict(lat, lon);
   }
 
-  function setUserLocation() {
+  async function setUserLocation() {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
+      navigator.geolocation.getCurrentPosition(async (position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
-        dispatch({
-          type: "location/setLocation",
-          payload: {
-            lat: lat,
-            lon: lon,
-          },
-        });
-        localStorage.setItem("lat", lat);
-        localStorage.setItem("lon", lon);
+        await predict(lat, lon);
       });
     } else {
       alert("Geolocation is not supported by this browser.");
     }
   }
 
-  const dispatch = useDispatch();
-  const location = useSelector(
-    (state: { location: Location }) => state.location,
-  );
-  const latitude = location.location.lat;
-  const longitude = location.location.lon;
-  const [predictions, setPredictions] = useState<Prediction[]>([]);
-
-  async function getSunsetPrediction() {
-    if (!latitude || !longitude) {
-      return;
-    }
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
-    const res = await fetch(url);
-    const forecast = (await res.json()) as WeatherForecast;
-    const predictions = calculateSunsetPredictions(forecast) as Prediction[];
-    setPredictions(predictions);
-    dispatch({
-      type: "location/resetLocation",
-    });
-  }
-
   useEffect(() => {
-    getSunsetPrediction();
-  }, [latitude, longitude]);
+    if (!prediction) {
+      const lat = Number(localStorage.getItem("lat"));
+      const lon = Number(localStorage.getItem("lon"));
+      if (lat && lon) {
+        predict(lat, lon);
+      }
+    }
+  }, []);
 
   return (
     <TooltipProvider>
@@ -124,28 +107,28 @@ export default function AppPage() {
         </div>
 
         <div className="group grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {predictions.map((prediction) => (
+          {prediction.map((entry) => (
             <Card
-              key={prediction.date}
-              className={`bg-gradient-to-br ${getScoreGradient(prediction.score.score).color} transition-all duration-300 ease-in-out hover:scale-105 hover:!opacity-100 group-hover:opacity-60`}
+              key={entry.date}
+              className={`bg-gradient-to-br ${getScoreGradient(entry.score.score).color} transition-all duration-300 ease-in-out hover:scale-105 hover:!opacity-100 group-hover:opacity-60`}
               style={{
-                filter: `saturate(${getScoreGradient(prediction.score.score).saturation}%)`,
+                filter: `saturate(${getScoreGradient(entry.score.score).saturation}%)`,
               }}
             >
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-semibold">
-                  {formatDate(prediction.sunset + "Z")}
+                  {formatDate(entry.sunset + "Z")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <WeatherDisplay
-                    weatherCode={prediction.weather_code.interpolate}
+                    weatherCode={entry.weather_code.interpolate}
                   />
                   <div className="flex items-center justify-center">
                     <TbSunset2 className="mb-2 h-12 w-12 text-yellow-300" />
                     <span className="text-4xl font-bold">
-                      {truncateScore(prediction.score.score) + "%"}
+                      {truncateScore(entry.score.score) + "%"}
                     </span>
                   </div>
                 </div>
@@ -155,7 +138,7 @@ export default function AppPage() {
                       <div className="flex items-center space-x-1">
                         <Hourglass className="h-6 w-6 text-yellow-300" />
                         <span className="text-sm">
-                          {formatTime(prediction.golden_hour.start)}
+                          {formatTime(entry.golden_hour.start)}
                         </span>
                       </div>
                     </TooltipTrigger>
@@ -169,7 +152,7 @@ export default function AppPage() {
                       <div className="flex items-center space-x-1">
                         <BsSunset className="h-6 w-6 text-orange-300" />
                         <span className="text-sm">
-                          {formatTime(prediction.sunset + "Z")}
+                          {formatTime(entry.sunset + "Z")}
                         </span>
                       </div>
                     </TooltipTrigger>
