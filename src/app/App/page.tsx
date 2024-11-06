@@ -13,9 +13,9 @@ import {
 } from "~/components/ui/tooltip";
 import WeatherDisplay from "~/components/weatherDisplay";
 import Locator from "~/components/locator";
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 import { type Place } from "~/types/location";
-import { getSunsetPrediction } from "~/lib/sunset/sunset";
+import usePrediction from "~/hooks/usePrediction";
 
 const getScoreGradient = (score: number) => {
   const baseColors = ["from-orange-300 via-pink-400 to-purple-500"];
@@ -23,27 +23,7 @@ const getScoreGradient = (score: number) => {
   return { color: `${baseColors[0]}`, saturation: saturation };
 };
 
-const formatTime = (timeString: string) => {
-  return new Date(timeString).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
 
-// If the new date is today, display "Today" instead of the date
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  const today = new Date();
-  if (date.getDate() === today.getDate()) {
-    return "Today";
-  } else {
-    return date.toLocaleDateString([], {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-  }
-};
 
 // Normalize score to a range between 13 and 93
 const truncateScore = (score: number, lowerLimit = 0, upperLimit = 93) => {
@@ -53,25 +33,17 @@ const truncateScore = (score: number, lowerLimit = 0, upperLimit = 93) => {
 };
 
 export default function AppPage() {
-  const dispatch = useDispatch();
+  const { predict } = usePrediction();
+
   const prediction = useSelector(
     (state: { prediction: { prediction: Prediction[] } }) =>
       state.prediction.prediction,
   );
 
-  async function predict(lat: Number, lon: Number) {
-    localStorage.setItem("lat", lat.toString());
-    localStorage.setItem("lon", lon.toString());
-    const predictions = await getSunsetPrediction(lat, lon);
-    dispatch({
-      type: "prediction/setPrediction",
-      payload: predictions,
-    });
-  }
   async function setPlace(place: Place) {
     const lat = place?.geometry?.location?.lat();
     const lon = place?.geometry?.location?.lng();
-    await predict(lat, lon);
+    await predict({ lat, lon });
   }
 
   async function setUserLocation() {
@@ -79,7 +51,7 @@ export default function AppPage() {
       navigator.geolocation.getCurrentPosition(async (position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
-        await predict(lat, lon);
+        await predict({ lat, lon });
       });
     } else {
       alert("Geolocation is not supported by this browser.");
@@ -91,10 +63,10 @@ export default function AppPage() {
       const lat = Number(localStorage.getItem("lat"));
       const lon = Number(localStorage.getItem("lon"));
       if (lat && lon) {
-        predict(lat, lon);
+        predict({ lat, lon });
       }
     }
-  }, []);
+  });
 
   return (
     <TooltipProvider>

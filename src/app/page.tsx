@@ -7,29 +7,21 @@ import { FcGlobe } from "react-icons/fc";
 import { FcOldTimeCamera } from "react-icons/fc";
 import { scrollIntoTheView } from "~/lib/document";
 import Locator from "~/components/locator";
-import { useDispatch } from "react-redux";
 import { Place } from "~/types/location";
-import { getSunsetPrediction } from "~/lib/sunset/sunset";
+import usePrediction from "~/hooks/usePrediction";
 
 export default function MainPage() {
   const Router = useRouter();
-  const dispatch = useDispatch();
+  const { predict } = usePrediction();
 
-  async function predict(lat: Number, lon: Number) {
-    localStorage.setItem("lat", lat.toString());
-    localStorage.setItem("lon", lon.toString());
-    const predictions = await getSunsetPrediction(lat, lon);
-    dispatch({
-      type: "prediction/setPrediction",
-      payload: predictions,
-    });
+  function toAppPage() {
     Router.push("/App");
   }
 
   async function setPlace(place: Place) {
     const lat = place?.geometry?.location?.lat();
     const lon = place?.geometry?.location?.lng();
-    await predict(lat, lon);
+    await predict({ lat, lon, onNavigate: toAppPage });
   }
 
   async function setUserLocation() {
@@ -37,7 +29,7 @@ export default function MainPage() {
       navigator.geolocation.getCurrentPosition(async (position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
-        await predict(lat, lon);
+        await predict({ lat, lon, onNavigate: toAppPage });
       });
     } else {
       alert("Geolocation is not supported by this browser.");
