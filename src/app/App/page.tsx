@@ -16,6 +16,7 @@ import Locator from "~/components/locator";
 import { useSelector } from "react-redux";
 import { type Place } from "~/types/location";
 import usePrediction from "~/hooks/usePrediction";
+import { formatDate, formatTime } from "~/lib/time/helper";
 
 const getScoreGradient = (score: number) => {
   const baseColors = ["from-orange-300 via-pink-400 to-purple-500"];
@@ -23,10 +24,7 @@ const getScoreGradient = (score: number) => {
   return { color: `${baseColors[0]}`, saturation: saturation };
 };
 
-
-
-// Normalize score to a range between 13 and 93
-const truncateScore = (score: number, lowerLimit = 0, upperLimit = 93) => {
+const truncateScore = (score: number, lowerLimit = 0, upperLimit = 100) => {
   const range = upperLimit - lowerLimit;
   score = (score / 100) * range + lowerLimit;
   return score.toFixed(0);
@@ -95,7 +93,7 @@ export default function AppPage() {
               <CardContent className="flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <WeatherDisplay
-                    weatherCode={entry.weather_code.interpolate}
+                    weatherCode={entry.weather_code}
                   />
                   <div className="flex items-center justify-center">
                     <TbSunset2 className="mb-2 h-12 w-12 text-yellow-300" />

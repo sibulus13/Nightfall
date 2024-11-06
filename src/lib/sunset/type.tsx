@@ -13,52 +13,16 @@ export type WeatherForecast = {
     relative_humidity_2m: number[];
     cloud_cover: number[];
     cloud_cover_low: number[];
-    // cloud_cover_mid: number[];
-    // cloud_cover_high: number[];
     visibility: number[];
   };
 };
 
 export type Prediction = {
-  date: string;
-  start_time: string;
-  sunset: string;
-  daylight_duration: number;
-  golden_hour_duration: string;
-  sunset_start_hourly_index: number;
-  sunset_end_hourly_index: number;
-  sunset_window: {
+  score: {};
+  golden_hour: {
     start: string;
     end: string;
   };
-  cloud_cover: {
-    start: number;
-    end: number;
-    interpolate: number;
-  };
-  cloud_cover_low: {
-    start: number;
-    end: number;
-    interpolate: number;
-  };
-  cloud_cover_mid: {
-    start: number;
-    end: number;
-    interpolate: number;
-  };
-  cloud_cover_high: {
-    start: number;
-    end: number;
-    interpolate: number;
-  };
-  visibility: {
-    start: number;
-    end: number;
-    interpolate: number;
-  };
-  humidity: {
-    start: number;
-    end: number;
-    interpolate: number;
-  };
+  weather_code: number;
+  sunset: string;
 };

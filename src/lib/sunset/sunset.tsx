@@ -4,7 +4,7 @@ export async function getSunsetPrediction(latitude: Number, longitude: Number) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
   const res = await fetch(url);
   const forecast = (await res.json()) as WeatherForecast;
-  const predictions = calculateSunsetPredictions(forecast) as Prediction[];
+  const predictions = calculateSunsetPredictions(forecast) as unknown as Prediction[];
   return predictions;
 }
 
@@ -45,60 +45,39 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
         start: forecast.hourly.time[sunset_start_hourly_index],
         end: forecast.hourly.time[sunset_end_hourly_index],
       },
-      cloud_cover: {
-        start: forecast.hourly.cloud_cover[sunset_start_hourly_index],
-        end: forecast.hourly.cloud_cover[sunset_end_hourly_index],
-        interpolate: interpolate(
-          forecast.hourly.cloud_cover[sunset_start_hourly_index],
-          forecast.hourly.cloud_cover[sunset_end_hourly_index],
-          interpolateRatio,
-        ),
-      },
-      cloud_cover_low: {
-        start: forecast.hourly.cloud_cover_low[sunset_start_hourly_index],
-        end: forecast.hourly.cloud_cover_low[sunset_end_hourly_index],
-        interpolate: interpolate(
-          forecast.hourly.cloud_cover_low[sunset_start_hourly_index],
-          forecast.hourly.cloud_cover_low[sunset_end_hourly_index],
-          interpolateRatio,
-        ),
-      },
-      visibility: {
-        start: forecast.hourly.visibility[sunset_start_hourly_index],
-        end: forecast.hourly.visibility[sunset_end_hourly_index],
-        interpolate: interpolate(
-          forecast.hourly.visibility[sunset_start_hourly_index],
-          forecast.hourly.visibility[sunset_end_hourly_index],
-          interpolateRatio,
-        ),
-      },
-      humidity: {
-        start: forecast.hourly.relative_humidity_2m[sunset_start_hourly_index],
-        end: forecast.hourly.relative_humidity_2m[sunset_end_hourly_index],
-        interpolate: interpolate(
-          forecast.hourly.relative_humidity_2m[sunset_start_hourly_index],
-          forecast.hourly.relative_humidity_2m[sunset_end_hourly_index],
-          interpolateRatio,
-        ),
-      },
-      weather_code: {
-        start: forecast.hourly.weather_code[sunset_start_hourly_index],
-        end: forecast.hourly.weather_code[sunset_end_hourly_index],
-        interpolate: interpolate(
-          forecast.hourly.weather_code[sunset_start_hourly_index],
-          forecast.hourly.weather_code[sunset_end_hourly_index],
-          interpolateRatio,
-          "closest",
-        ),
-      },
-      // weather_condition: getWeatherCondition(
-      //   forecast.hourly.weather_code[sunset_start_hourly_index],
-      // ),
+      cloud_cover: interpolate(
+        forecast.hourly.cloud_cover[sunset_start_hourly_index],
+        forecast.hourly.cloud_cover[sunset_end_hourly_index],
+        interpolateRatio,
+      ),
+      cloud_cover_low: interpolate(
+        forecast.hourly.cloud_cover_low[sunset_start_hourly_index],
+        forecast.hourly.cloud_cover_low[sunset_end_hourly_index],
+        interpolateRatio,
+      ),
+      visibility: interpolate(
+        forecast.hourly.visibility[sunset_start_hourly_index],
+        forecast.hourly.visibility[sunset_end_hourly_index],
+        interpolateRatio,
+      ),
+      humidity: interpolate(
+        forecast.hourly.relative_humidity_2m[sunset_start_hourly_index],
+        forecast.hourly.relative_humidity_2m[sunset_end_hourly_index],
+        interpolateRatio,
+      ),
+      weather_code: interpolate(
+        forecast.hourly.weather_code[sunset_start_hourly_index],
+        forecast.hourly.weather_code[sunset_end_hourly_index],
+        interpolateRatio,
+        "closest",
+      ),
     };
     const sunsetScore = calculateSunsetScore(prediction);
     const res = {
-      ...prediction,
       score: sunsetScore,
+      golden_hour: prediction.golden_hour,
+      weather_code: prediction.weather_code,
+      sunset: prediction.sunset,
     };
     predictions.push(res);
   }
@@ -137,8 +116,6 @@ function calculateSunsetScore(prediction: Prediction) {
   const vsScore = visibilityScore(prediction);
   const hScore = humidityScore(prediction);
   // TODO calculate air quality score
-  score *= 1;
-
   score *= cCScore * vsScore * hScore;
 
   return {
@@ -152,13 +129,13 @@ function calculateSunsetScore(prediction: Prediction) {
 // Calculate the humidity score based on the prediction
 // Inverse relationship between humidity and sunset quality
 function humidityScore(prediction: Prediction) {
-  if (prediction.humidity.interpolate > 80) {
+  if (prediction.humidity > 80) {
     return 0.7;
   }
-  if (prediction.humidity.interpolate > 60) {
+  if (prediction.humidity > 60) {
     return 0.8;
   }
-  if (prediction.humidity.interpolate > 40) {
+  if (prediction.humidity > 40) {
     return 0.9;
   }
   return 1;
@@ -170,10 +147,10 @@ function visibilityScore(prediction: Prediction) {
   // Obviously too little visibility is bad
   // Lets assume that 10km visibility is the threshold
   // and 30km visibility is the threshold
-  if (prediction.visibility.interpolate < 10000) {
+  if (prediction.visibility < 10000) {
     return 0.7;
   }
-  if (prediction.visibility.interpolate < 20000) {
+  if (prediction.visibility < 20000) {
     return 0.9;
   }
   return 1;
@@ -190,13 +167,10 @@ function cloudCoverageScore(prediction: Prediction) {
   // calculate overall cloud cover score
   // Too little or too much cloud coverage is bad
   // The ideal cloud coverage is around 40%
-  if (
-    prediction.cloud_cover.interpolate > 90 ||
-    prediction.cloud_cover.interpolate < 10
-  ) {
+  if (prediction.cloud_cover > 90 || prediction.cloud_cover < 10) {
     score *= 0.5;
   } else {
-    score *= 1 - Math.abs(prediction.cloud_cover.interpolate - 40) / 100;
+    score *= 1 - Math.abs(prediction.cloud_cover - 40) / 100;
   }
 
   // calculate low cloud cover score
@@ -204,10 +178,10 @@ function cloudCoverageScore(prediction: Prediction) {
   // Assuming Cloud coverage above 40% is bad
   // Assuming ideal low cloud coverage is around 15%
   // TODO finetune these thresholds
-  if (prediction.cloud_cover_low.interpolate > 40) {
-    score *= 1 - prediction.cloud_cover_low.interpolate / 100 + 0.5;
+  if (prediction.cloud_cover_low > 40) {
+    score *= 1 - prediction.cloud_cover_low / 100 + 0.5;
   } else {
-    score *= 1 - Math.abs(prediction.cloud_cover_low.interpolate - 15) / 100;
+    score *= 1 - Math.abs(prediction.cloud_cover_low - 15) / 100;
   }
 
   return score;
