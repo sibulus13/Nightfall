@@ -6,7 +6,7 @@ const AboutPage = () => {
       <div>
         <h1>About Nightfall</h1>
         <p className="text-sm text-gray-400">
-          Never Miss a Perfect Sunset Again
+          Never Miss Another Perfect Sunset
         </p>
 
         <p className="pt-4">

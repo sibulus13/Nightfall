@@ -18,11 +18,11 @@ export type WeatherForecast = {
 };
 
 export type Prediction = {
-  score: {};
+  score: number;
   golden_hour: {
     start: string;
     end: string;
   };
   weather_code: number;
-  sunset: string;
+  sunset_time: string;
 };

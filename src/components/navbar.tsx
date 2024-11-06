@@ -23,7 +23,7 @@ const Navbar: React.FC = () => {
           <Link href="/App">App</Link>
         </li>
         <li>
-          <Link href="/Api-doc">API</Link>
+          {/* <Link href="/Api-doc">API</Link> */}
         </li>
         <li>
           <Link href="/About">About</Link>

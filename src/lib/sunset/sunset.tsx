@@ -4,7 +4,9 @@ export async function getSunsetPrediction(latitude: Number, longitude: Number) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
   const res = await fetch(url);
   const forecast = (await res.json()) as WeatherForecast;
-  const predictions = calculateSunsetPredictions(forecast) as unknown as Prediction[];
+  const predictions = calculateSunsetPredictions(
+    forecast,
+  ) as unknown as Prediction[];
   return predictions;
 }
 
@@ -74,10 +76,10 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
     };
     const sunsetScore = calculateSunsetScore(prediction);
     const res = {
-      score: sunsetScore,
+      score: sunsetScore.score,
       golden_hour: prediction.golden_hour,
       weather_code: prediction.weather_code,
-      sunset: prediction.sunset,
+      sunset_time: prediction.sunset,
     };
     predictions.push(res);
   }

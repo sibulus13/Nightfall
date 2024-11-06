@@ -79,26 +79,24 @@ export default function AppPage() {
         <div className="group grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {prediction.map((entry) => (
             <Card
-              key={entry.date}
-              className={`bg-gradient-to-br ${getScoreGradient(entry.score.score).color} transition-all duration-300 ease-in-out hover:scale-105 hover:!opacity-100 group-hover:opacity-60`}
+              key={entry.sunset_time}
+              className={`bg-gradient-to-br ${getScoreGradient(entry.score).color} transition-all duration-300 ease-in-out hover:scale-105 hover:!opacity-100 group-hover:opacity-60`}
               style={{
-                filter: `saturate(${getScoreGradient(entry.score.score).saturation}%)`,
+                filter: `saturate(${getScoreGradient(entry.score).saturation}%)`,
               }}
             >
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-semibold">
-                  {formatDate(entry.sunset + "Z")}
+                  {formatDate(entry.sunset_time + "Z")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col justify-between">
                 <div className="flex items-center justify-between">
-                  <WeatherDisplay
-                    weatherCode={entry.weather_code}
-                  />
+                  <WeatherDisplay weatherCode={entry.weather_code} />
                   <div className="flex items-center justify-center">
                     <TbSunset2 className="mb-2 h-12 w-12 text-yellow-300" />
                     <span className="text-4xl font-bold">
-                      {truncateScore(entry.score.score) + "%"}
+                      {truncateScore(entry.score) + "%"}
                     </span>
                   </div>
                 </div>
@@ -122,7 +120,7 @@ export default function AppPage() {
                       <div className="flex items-center space-x-1">
                         <BsSunset className="h-6 w-6 text-orange-300" />
                         <span className="text-sm">
-                          {formatTime(entry.sunset + "Z")}
+                          {formatTime(entry.sunset_time + "Z")}
                         </span>
                       </div>
                     </TooltipTrigger>
