@@ -77,6 +77,6 @@
 
 @layer utilities {
   .page {
-    @apply flex min-h-[calc(100vh-155px)] flex-col p-4 pb-6 md:px-24 lg:px-44;
+    @apply flex min-h-[calc(100vh-155px)] md:min-h-[calc(100vh-135px)] flex-col p-4 pb-6 md:px-24 lg:px-44;
   }
 }
