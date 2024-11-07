@@ -2,8 +2,8 @@ import { useDispatch } from "react-redux";
 import { getSunsetPrediction } from "~/lib/sunset/sunset";
 
 interface PredictionProps {
-    lat: Number;
-    lon: Number;
+    lat: number;
+    lon: number;
     onNavigate?: () => void;
 }
 
