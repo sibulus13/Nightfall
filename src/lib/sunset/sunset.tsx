@@ -11,7 +11,7 @@ export async function getSunsetPrediction(latitude: Number, longitude: Number) {
 }
 
 // Calculates the sunset predictions based on the forecast data
-export function calculateSunsetPredictions(forecast: WeatherForecast) {
+export function calculateSunsetPredictions(forecast: any) {
   const predictions = [];
   const numberOfDays = forecast.daily?.time?.length ?? 0;
   // Get the sunset and sunrise times for each day
@@ -80,6 +80,8 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
       golden_hour: prediction.golden_hour,
       weather_code: prediction.weather_code,
       sunset_time: prediction.sunset,
+      scores: sunsetScore,
+      // ...prediction,
     };
     predictions.push(res);
   }
@@ -112,7 +114,7 @@ function interpolate(start: number, end: number, ratio: number, type?: string) {
 }
 
 // Calculate the sunset score based on the prediction
-function calculateSunsetScore(prediction: Prediction) {
+function calculateSunsetScore(prediction: any) {
   let score = 1;
   const cCScore = cloudCoverageScore(prediction);
   const vsScore = visibilityScore(prediction);
@@ -130,7 +132,7 @@ function calculateSunsetScore(prediction: Prediction) {
 
 // Calculate the humidity score based on the prediction
 // Inverse relationship between humidity and sunset quality
-function humidityScore(prediction: Prediction) {
+function humidityScore(prediction: any) {
   if (prediction.humidity > 80) {
     return 0.7;
   }
@@ -143,7 +145,7 @@ function humidityScore(prediction: Prediction) {
   return 1;
 }
 
-function visibilityScore(prediction: Prediction) {
+function visibilityScore(prediction: any) {
   // TODO finetune these thresholds
   // How does air pollution affect visibility? Since air pollution makes for more vibrant sunsets
   // Obviously too little visibility is bad
@@ -158,7 +160,7 @@ function visibilityScore(prediction: Prediction) {
   return 1;
 }
 
-function cloudCoverageScore(prediction: Prediction) {
+function cloudCoverageScore(prediction: any) {
   // Sunset is affected by cloud coverage split by low vs mid/high clouds
   // Too much low cloud coverage (>50%) is bad
   // Some mid/high cloud coverage (cirrus) can be good
