@@ -48,14 +48,14 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
         forecast.daily.sunset[i]!,
         forecast.daily.daylight_duration[i]!,
       ),
-      daylight_duration: forecast.daily.daylight_duration[i],
+      daylight_duration: forecast.daily.daylight_duration[i]!,
       sunset_start_hourly_index: sunset_start_hourly_index,
       sunset_end_hourly_index: sunset_end_hourly_index,
       sunset_window: {
-        start: forecast.hourly.time[sunset_start_hourly_index],
-        end: forecast.hourly.time[sunset_end_hourly_index],
+        start: forecast.hourly.time[sunset_start_hourly_index]!,
+        end: forecast.hourly.time[sunset_end_hourly_index]!,
       },
-      sunset: forecast.daily.sunset[i],
+      sunset: forecast.daily.sunset[i]!,
       cloud_cover: interpolate(
         forecast.hourly.cloud_cover[sunset_start_hourly_index]!,
         forecast.hourly.cloud_cover[sunset_end_hourly_index]!,

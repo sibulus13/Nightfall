@@ -29,9 +29,21 @@ export type Prediction = {
 };
 
 export type PredictionData = {
-  humidity: number;
+  golden_hour: {
+    start: string;
+    end: string;
+  };
+  daylight_duration: number;
+  sunset_start_hourly_index: number;
+  sunset_end_hourly_index: number;
+  sunset_window: {
+    start: string;
+    end: string;
+  };
+  sunset: string;
   cloud_cover: number;
   cloud_cover_low: number;
   visibility: number;
+  humidity: number;
   weather_code: number;
 };
