@@ -1,11 +1,7 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import { useMapsLibrary } from "@vis.gl/react-google-maps";
-
-interface PlaceAutocompleteProps {
-  onPlaceSelect: (place: google.maps.places.PlaceResult | null) => void;
-}
-
+import { type PlaceAutocompleteProps } from "~/types/location";
 export const PlaceAutocomplete = ({
   onPlaceSelect,
 }: PlaceAutocompleteProps) => {

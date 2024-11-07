@@ -38,18 +38,21 @@ export default function AppPage() {
       state.prediction.prediction,
   );
 
-  async function setPlace(place: Place) {
+  async function setPlace(place: google.maps.places.PlaceResult | null) {
     const lat = place?.geometry?.location?.lat();
     const lon = place?.geometry?.location?.lng();
+    if (!lat || !lon) {
+      return;
+    }
     await predict({ lat, lon });
   }
 
   async function setUserLocation() {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(async (position) => {
+      navigator?.geolocation?.getCurrentPosition((position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
-        await predict({ lat, lon });
+        predict({ lat, lon }).catch(console.error);
       });
     } else {
       alert("Geolocation is not supported by this browser.");
@@ -61,10 +64,10 @@ export default function AppPage() {
       const lat = Number(localStorage.getItem("lat"));
       const lon = Number(localStorage.getItem("lon"));
       if (lat && lon) {
-        predict({ lat, lon });
+        predict({ lat, lon }).catch(console.error);
       }
     }
-  });
+  }, [prediction, predict]);
 
   return (
     <TooltipProvider>

@@ -2,10 +2,15 @@ import { PlaceAutocomplete } from "~/components/autoComplete";
 import { APIProvider } from "@vis.gl/react-google-maps";
 import { FaLocationCrosshairs } from "react-icons/fa6";
 
+interface LocatorProps {
+  setSelectedPlace: (place: google.maps.places.PlaceResult | null) => void;
+  handleLocationClick: () => void;
+}
+
 export default function Locator({
   setSelectedPlace,
   handleLocationClick,
-}: any) {
+}: LocatorProps) {
   const API_KEY: string = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!;
 
   return (

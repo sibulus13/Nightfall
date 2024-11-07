@@ -7,7 +7,6 @@ import { FcGlobe } from "react-icons/fc";
 import { FcOldTimeCamera } from "react-icons/fc";
 import { scrollIntoTheView } from "~/lib/document";
 import Locator from "~/components/locator";
-import { Place } from "~/types/location";
 import usePrediction from "~/hooks/usePrediction";
 
 export default function MainPage() {
@@ -18,18 +17,20 @@ export default function MainPage() {
     Router.push("/App");
   }
 
-  async function setPlace(place: Place) {
+  async function setPlace(place: google.maps.places.PlaceResult | null) {
     const lat = place?.geometry?.location?.lat();
     const lon = place?.geometry?.location?.lng();
-    await predict({ lat, lon, onNavigate: toAppPage });
+    if (lat && lon) {
+      await predict({ lat, lon, onNavigate: toAppPage });
+    }
   }
 
   async function setUserLocation() {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(async (position) => {
+      navigator.geolocation.getCurrentPosition((position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
-        await predict({ lat, lon, onNavigate: toAppPage });
+        predict({ lat, lon, onNavigate: toAppPage }).catch(console.error);
       });
     } else {
       alert("Geolocation is not supported by this browser.");

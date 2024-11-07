@@ -14,6 +14,7 @@ export type WeatherForecast = {
     cloud_cover: number[];
     cloud_cover_low: number[];
     visibility: number[];
+    weather_code: number[];
   };
 };
 

@@ -1,17 +1,16 @@
 import { createSlice } from "@reduxjs/toolkit";
-
+import { type Prediction } from "../sunset/type";
 export const predictionSlice = createSlice({
   name: "prediction",
   initialState: {
-    prediction: [],
+    prediction: [] as Prediction[],
   },
   reducers: {
-    setPrediction: (state, action) => {
+    setPrediction: (state, action: { payload: Prediction[] }) => {
       state.prediction = action.payload;
     },
-
     resetPrediction: (state) => {
-      state.prediction = [];
+      state.prediction = [] as Prediction[];
     },
   },
 });

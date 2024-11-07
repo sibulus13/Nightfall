@@ -1,6 +1,6 @@
 import { type WeatherForecast, type Prediction } from "~/lib/sunset/type";
 
-export async function getSunsetPrediction(latitude: Number, longitude: Number) {
+export async function getSunsetPrediction(latitude: number, longitude: number) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
   const res = await fetch(url);
   const forecast = (await res.json()) as WeatherForecast;
@@ -11,12 +11,20 @@ export async function getSunsetPrediction(latitude: Number, longitude: Number) {
 }
 
 // Calculates the sunset predictions based on the forecast data
-export function calculateSunsetPredictions(forecast: any) {
+export function calculateSunsetPredictions(forecast: WeatherForecast) {
   const predictions = [];
   const numberOfDays = forecast.daily?.time?.length ?? 0;
   // Get the sunset and sunrise times for each day
   for (let i = 0; i < numberOfDays; i++) {
-    const startTime: string = forecast?.daily?.sunset[i]?.slice(0, -2) + "00";
+    const sunsetTime = forecast?.daily?.sunset[i];
+    if (!sunsetTime) {
+      console.error(
+        "Error: Sunset time is undefined for",
+        forecast.daily.time[i],
+      );
+      continue;
+    }
+    const startTime: string = sunsetTime.slice(0, -2) + "00";
     const sunset_start_hourly_index: number = forecast.hourly.time.findIndex(
       (time: string) => {
         return time === startTime;
@@ -32,44 +40,41 @@ export function calculateSunsetPredictions(forecast: any) {
     const sunset_end_hourly_index = sunset_start_hourly_index + 1;
     const interpolateRatio = Number(forecast?.daily?.sunset[i]?.slice(-2)) / 60;
     const prediction = {
-      date: forecast.daily.time[i],
-      // TODO: extrapolate to sunrise as well
-      start_time: startTime,
-      sunset: forecast.daily.sunset[i],
-      daylight_duration: forecast.daily.daylight_duration[i],
       golden_hour: calculateGoldenHour(
-        forecast.daily.sunset[i],
-        forecast.daily.daylight_duration[i],
+        forecast.daily.sunset[i]!,
+        forecast.daily.daylight_duration[i]!,
       ),
+      daylight_duration: forecast.daily.daylight_duration[i],
       sunset_start_hourly_index: sunset_start_hourly_index,
       sunset_end_hourly_index: sunset_end_hourly_index,
       sunset_window: {
         start: forecast.hourly.time[sunset_start_hourly_index],
         end: forecast.hourly.time[sunset_end_hourly_index],
       },
+      sunset: forecast.daily.sunset[i],
       cloud_cover: interpolate(
-        forecast.hourly.cloud_cover[sunset_start_hourly_index],
-        forecast.hourly.cloud_cover[sunset_end_hourly_index],
+        forecast.hourly.cloud_cover[sunset_start_hourly_index]!,
+        forecast.hourly.cloud_cover[sunset_end_hourly_index]!,
         interpolateRatio,
       ),
       cloud_cover_low: interpolate(
-        forecast.hourly.cloud_cover_low[sunset_start_hourly_index],
-        forecast.hourly.cloud_cover_low[sunset_end_hourly_index],
+        forecast.hourly.cloud_cover_low[sunset_start_hourly_index]!,
+        forecast.hourly.cloud_cover_low[sunset_end_hourly_index]!,
         interpolateRatio,
       ),
       visibility: interpolate(
-        forecast.hourly.visibility[sunset_start_hourly_index],
-        forecast.hourly.visibility[sunset_end_hourly_index],
+        forecast.hourly.visibility[sunset_start_hourly_index]!,
+        forecast.hourly.visibility[sunset_end_hourly_index]!,
         interpolateRatio,
       ),
       humidity: interpolate(
-        forecast.hourly.relative_humidity_2m[sunset_start_hourly_index],
-        forecast.hourly.relative_humidity_2m[sunset_end_hourly_index],
+        forecast.hourly.relative_humidity_2m[sunset_start_hourly_index]!,
+        forecast.hourly.relative_humidity_2m[sunset_end_hourly_index]!,
         interpolateRatio,
       ),
       weather_code: interpolate(
-        forecast.hourly.weather_code[sunset_start_hourly_index],
-        forecast.hourly.weather_code[sunset_end_hourly_index],
+        forecast.hourly.weather_code[sunset_start_hourly_index]!,
+        forecast.hourly.weather_code[sunset_end_hourly_index]!,
         interpolateRatio,
         "closest",
       ),
