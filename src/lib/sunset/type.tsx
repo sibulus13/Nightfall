@@ -27,3 +27,11 @@ export type Prediction = {
   weather_code: number;
   sunset_time: string;
 };
+
+export type PredictionData = {
+  humidity: number;
+  cloud_cover: number;
+  cloud_cover_low: number;
+  visibility: number;
+  weather_code: number;
+};

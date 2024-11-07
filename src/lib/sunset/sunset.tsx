@@ -1,4 +1,8 @@
-import { type WeatherForecast, type Prediction } from "~/lib/sunset/type";
+import {
+  type WeatherForecast,
+  type Prediction,
+  type PredictionData,
+} from "~/lib/sunset/type";
 
 export async function getSunsetPrediction(latitude: number, longitude: number) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
@@ -119,7 +123,7 @@ function interpolate(start: number, end: number, ratio: number, type?: string) {
 }
 
 // Calculate the sunset score based on the prediction
-function calculateSunsetScore(prediction: any) {
+function calculateSunsetScore(prediction: PredictionData) {
   let score = 1;
   const cCScore = cloudCoverageScore(prediction);
   const vsScore = visibilityScore(prediction);
@@ -137,7 +141,7 @@ function calculateSunsetScore(prediction: any) {
 
 // Calculate the humidity score based on the prediction
 // Inverse relationship between humidity and sunset quality
-function humidityScore(prediction: any) {
+function humidityScore(prediction: PredictionData) {
   if (prediction.humidity > 80) {
     return 0.7;
   }
@@ -150,7 +154,7 @@ function humidityScore(prediction: any) {
   return 1;
 }
 
-function visibilityScore(prediction: any) {
+function visibilityScore(prediction: PredictionData) {
   // TODO finetune these thresholds
   // How does air pollution affect visibility? Since air pollution makes for more vibrant sunsets
   // Obviously too little visibility is bad
@@ -165,7 +169,7 @@ function visibilityScore(prediction: any) {
   return 1;
 }
 
-function cloudCoverageScore(prediction: any) {
+function cloudCoverageScore(prediction: PredictionData) {
   // Sunset is affected by cloud coverage split by low vs mid/high clouds
   // Too much low cloud coverage (>50%) is bad
   // Some mid/high cloud coverage (cirrus) can be good
