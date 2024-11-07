@@ -39,9 +39,10 @@ export default function MainPage() {
 
   return (
     <div className="page items-center gap-24">
-      <div className="flex h-[calc(85vh)] w-screen flex-col bg-gradient-to-b from-transparent via-pink-300 to-transparent">
+      <div className="flex h-[calc(85vh)] flex-col bg-gradient-to-b from-transparent via-pink-300 to-transparent w-screen lg:w-[calc(100vw-17px)]"> 
+        {/* Janky lg-w screen to full screen without scroll bar */}
         {/* Headline */}
-        <div className="flex grow flex-col items-center justify-center px-4">
+        <div className="flex grow flex-col items-center justify-center">
           <h1 className="text-3xl">
             Weekly
             <span className="bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">

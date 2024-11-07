@@ -14,7 +14,6 @@ import {
 import WeatherDisplay from "~/components/weatherDisplay";
 import Locator from "~/components/locator";
 import { useSelector } from "react-redux";
-import { type Place } from "~/types/location";
 import usePrediction from "~/hooks/usePrediction";
 import { formatDate, formatTime } from "~/lib/time/helper";
 
@@ -72,7 +71,7 @@ export default function AppPage() {
   return (
     <TooltipProvider>
       <div className="page justify-center">
-        <div className="flex gap-2 p-2 py-4">
+        <div className="flex justify-center p-2 py-4">
           <Locator
             setSelectedPlace={setPlace}
             handleLocationClick={setUserLocation}
