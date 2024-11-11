@@ -39,7 +39,7 @@ export default function MainPage() {
 
   return (
     <div className="page items-center gap-24">
-      <div className="flex h-[calc(85vh)] flex-col bg-gradient-to-b from-transparent via-pink-300 to-transparent w-screen lg:w-[calc(100vw-17px)]"> 
+      <div className="flex h-[calc(85vh)] w-screen flex-col overflow-clip bg-gradient-to-b from-transparent via-pink-300 to-transparent lg:w-[calc(100vw-10px)]">
         {/* Janky lg-w screen to full screen without scroll bar */}
         {/* Headline */}
         <div className="flex grow flex-col items-center justify-center">

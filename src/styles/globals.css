@@ -57,6 +57,21 @@
   }
 }
 @layer base {
+  /* width */
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  /* Track */
+  ::-webkit-scrollbar-track {
+    background: #888;
+  }
+
+  /* Handle */
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, #888, #b556c8, #76082d, #888);
+  }
+
   * {
     @apply scroll-smooth border-black border-border;
   }
@@ -77,6 +92,6 @@
 
 @layer utilities {
   .page {
-    @apply flex min-h-[calc(100vh-155px)] md:min-h-[calc(100vh-135px)] flex-col p-4 pb-6 md:px-24 lg:px-44;
+    @apply flex min-h-[calc(100vh-155px)] w-full flex-col p-4 pb-6 md:min-h-[calc(100vh-135px)] md:px-24 lg:px-44;
   }
 }
