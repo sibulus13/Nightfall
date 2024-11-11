@@ -1,11 +1,14 @@
 import "~/styles/globals.css";
 
 import { GeistSans } from "geist/font/sans";
+import GoogleTagManager from "@magicul/next-google-tag-manager";
 import { type Metadata } from "next";
+import { Analytics } from "@vercel/analytics/react";
 import Navbar from "~/components/navbar";
 import Footer from "~/components/footer";
 import { ThemeProvider } from "~/components/themeProvider";
 import StoreProvider from "./StoreProvider";
+import { env } from "process";
 
 export const metadata: Metadata = {
   title: "Nightfall | Sunset Quality Forecast",
@@ -13,12 +16,15 @@ export const metadata: Metadata = {
   icons: [{ rel: "icon", url: "/icon.ico" }],
 };
 
+const NEXT_PUBLIC_GOOGLE_TAG_ID = env.NEXT_PUBLIC_GOOGLE_TAG_ID!;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${GeistSans.variable}`}>
       <body>
+        <GoogleTagManager id={NEXT_PUBLIC_GOOGLE_TAG_ID} />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -29,6 +35,7 @@ export default function RootLayout({
             <Navbar />
             {children}
             <Footer />
+            <Analytics />
           </StoreProvider>
         </ThemeProvider>
       </body>
