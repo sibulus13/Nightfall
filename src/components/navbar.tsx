@@ -15,16 +15,14 @@ const Navbar: React.FC = () => {
             height={50}
             className="pb-2"
           />
-          <p className="">Nightfall</p>
+          <p className="">Nightfalls</p>
         </div>
       </Link>
       <ul className="flex items-center justify-evenly gap-2 md:gap-6">
         <li>
           <Link href="/App">App</Link>
         </li>
-        <li>
-          {/* <Link href="/Api-doc">API</Link> */}
-        </li>
+        <li>{/* <Link href="/Api-doc">API</Link> */}</li>
         <li>
           <Link href="/About">About</Link>
         </li>

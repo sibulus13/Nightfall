@@ -2,17 +2,17 @@ export default function PrivacyPage() {
   return (
     <div className="page gap-10">
       <div>
-        <h1 className="font-bold">Nightfall Privacy Policy</h1>
+        <h1 className="font-bold">Nightfalls Privacy Policy</h1>
         <p className="text-xl italic">Last updated: November 2023</p>
       </div>
       <div>
-        <p className="font-bold">1. About Nightfall</p>
+        <p className="font-bold">1. About Nightfalls</p>
         <p>
-          This Privacy Policy explains how Nightfall (&quot;we,&quot;
+          This Privacy Policy explains how Nightfalls (&quot;we,&quot;
           &quot;our,&quot; or &quot;us&quot;) collects, uses, and shares your
           information when you use our sunset prediction application (&quot;the
           App&quot;). We are committed to protecting your privacy and being
-          transparent about our data practices. Nightfall is a sunset quality
+          transparent about our data practices. Nightfalls is a sunset quality
           forecasting application that predicts the quality of sunsets based on
           various factors such as weather conditions, cloud cover, and more.
         </p>
@@ -111,13 +111,13 @@ export default function PrivacyPage() {
       <div>
         <h2>8. Account Information</h2>
         <p>
-          Nightfall does not require user accounts and does not collect or store
+          Nightfalls does not require user accounts and does not collect or store
           account information.
         </p>
       </div>
       <div>
         <h2>9. Cookies and Tracking</h2>
-        <p>Nightfall does not use cookies or persistent tracking mechanisms.</p>
+        <p>Nightfalls does not use cookies or persistent tracking mechanisms.</p>
       </div>
       <div>
         <h2>10. Children&apos;s Privacy</h2>

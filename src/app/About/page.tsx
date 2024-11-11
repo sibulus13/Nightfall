@@ -4,13 +4,13 @@ const AboutPage = () => {
   return (
     <div className="page gap-10">
       <div>
-        <h1>About Nightfall</h1>
+        <h1>About Nightfalls</h1>
         <p className="text-sm text-gray-400">
           Never Miss Another Perfect Sunset
         </p>
 
         <p className="pt-4">
-          Nightfall is a web application born from a photographer&apos;s simple
+          Nightfalls is a web application born from a photographer&apos;s simple
           desire: to never miss another spectacular sunset. We combine precise
           astronomical data with real-time weather forecasts to help you capture
           or simply enjoy nature&apos;s daily masterpiece.
@@ -65,12 +65,12 @@ const AboutPage = () => {
             - An adventure seeker looking for the perfect golden hour hike
           </li>
         </ul>
-        <p>Nightfall helps you make the most of every sunset opportunity.</p>
+        <p>Nightfalls helps you make the most of every sunset opportunity.</p>
       </div>
       <div>
         <h2>Our Story</h2>
         <p>
-          Nightfall was created by a developer who, after missing one too many
+          Nightfalls was created by a developer who, after missing one too many
           spectacular sunsets while working, decided to solve the problem once
           and for all. What started as a personal tool to catch nature&apos;s
           daily show has grown into a platform for anyone who believes that
@@ -81,7 +81,7 @@ const AboutPage = () => {
         <h2>Technical Excellence</h2>
         <ul>
           <li>
-            - Web-Based Platform: Access Nightfall from any device with a web
+            - Web-Based Platform: Access Nightfalls from any device with a web
             browser
           </li>
           <li>

@@ -12,7 +12,7 @@ import { env } from "process";
 import { Suspense } from "react";
 
 export const metadata: Metadata = {
-  title: "Nightfall | Sunset Quality Forecast",
+  title: "Nightfalls | Sunset Quality Forecast",
   description: "A dashboard for predicting weekly sunset quality",
   icons: [{ rel: "icon", url: "/icon.ico" }],
 };

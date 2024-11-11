@@ -69,20 +69,20 @@ export default function MainPage() {
       <div className="flex flex-col items-center pt-10" id="features-section">
         <GrScorecard className="h-24 w-24" />
         <h2 className="mb-2 border-b p-1 pt-4">Sunset Score</h2>
-        Nightfall provides location-based weekly sunset quality forecasts.
+        Nightfalls provides location-based weekly sunset quality forecasts.
         Providing a holisttic score to easily visualize the quality of the
         sunset for the week in a single glance.
       </div>
       <div className="flex flex-col items-center">
         <FcGlobe className="h-24 w-24" />
         <h2 className="mb-2 border-b p-1 pt-4">Global Predictions</h2>
-        From Vancouver, Canada, to Sydney, Australia, Nightfall provides sunset
+        From Vancouver, Canada, to Sydney, Australia, Nightfalls provides sunset
         quality forecasts for locations around the world.
       </div>
       <div className="flex flex-col items-center">
         <FcOldTimeCamera className="h-24 w-24" />
         <h2 className="mb-2 border-b p-1">For Photographers</h2>
-        Lighting is a key factor in photography. Nightfall provides information
+        Lighting is a key factor in photography. Nightfalls provides information
         on each day&apos;s golden hour as well as weather condition to help
         photographers plan their shoots, so you can always find the perfect
         condition to capture the perfect moment!
