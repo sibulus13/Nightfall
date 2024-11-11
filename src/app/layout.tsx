@@ -9,6 +9,7 @@ import Footer from "~/components/footer";
 import { ThemeProvider } from "~/components/themeProvider";
 import StoreProvider from "./StoreProvider";
 import { env } from "process";
+import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "Nightfall | Sunset Quality Forecast",
@@ -24,7 +25,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.variable}`}>
       <body>
-        <GoogleTagManager id={NEXT_PUBLIC_GOOGLE_TAG_ID} />
+        <Suspense>
+          <GoogleTagManager id={NEXT_PUBLIC_GOOGLE_TAG_ID} />
+        </Suspense>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
