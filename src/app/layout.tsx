@@ -10,6 +10,7 @@ import { ThemeProvider } from "~/components/themeProvider";
 import StoreProvider from "./StoreProvider";
 import { env } from "process";
 import { Suspense } from "react";
+import { GoogleAnalytics } from "@next/third-parties/google";
 
 export const metadata: Metadata = {
   title: "Nightfalls | Sunset Quality Forecast",
@@ -25,9 +26,6 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.variable}`}>
       <body>
-        <Suspense>
-          <GoogleTagManager id={NEXT_PUBLIC_GOOGLE_TAG_ID} />
-        </Suspense>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -38,10 +36,11 @@ export default function RootLayout({
             <Navbar />
             {children}
             <Footer />
-            <Analytics />
           </StoreProvider>
         </ThemeProvider>
       </body>
+      <Analytics />
+      <GoogleAnalytics gaId={NEXT_PUBLIC_GOOGLE_TAG_ID} />
     </html>
   );
 }
