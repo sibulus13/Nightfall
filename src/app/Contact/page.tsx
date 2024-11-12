@@ -4,7 +4,7 @@ export default function ContactPage() {
     <div className="page">
       <h1 className="text-4xl font-bold">Contact</h1>
       <p className="text-lg">
-        For any inquiries, questions, feedback, or bug report, please contact us
+        For any inquiries, questions, feedback, or bug report, please contact me
         at:{" "}
         <Link
           className="underline"

@@ -6,7 +6,7 @@ export default function PrivacyPage() {
         <p className="text-xl italic">Last updated: November 2023</p>
       </div>
       <div>
-        <p className="font-bold">1. About Nightfalls</p>
+        <h2 className="font-bold">1. About Nightfalls</h2>
         <p>
           This Privacy Policy explains how Nightfalls (&quot;we,&quot;
           &quot;our,&quot; or &quot;us&quot;) collects, uses, and shares your
@@ -111,13 +111,15 @@ export default function PrivacyPage() {
       <div>
         <h2>8. Account Information</h2>
         <p>
-          Nightfalls does not require user accounts and does not collect or store
-          account information.
+          Nightfalls does not require user accounts and does not collect or
+          store account information.
         </p>
       </div>
       <div>
         <h2>9. Cookies and Tracking</h2>
-        <p>Nightfalls does not use cookies or persistent tracking mechanisms.</p>
+        <p>
+          Nightfalls does not use cookies or persistent tracking mechanisms.
+        </p>
       </div>
       <div>
         <h2>10. Children&apos;s Privacy</h2>

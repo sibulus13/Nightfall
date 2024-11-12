@@ -98,10 +98,10 @@ const AboutPage = () => {
         </ul>
       </div>
       <div>
-        <h2>Contact Us</h2>
+        <h2>Contact Me</h2>
         <p>
           Have questions, suggestions, or just want to share your perfect sunset
-          shot? Reach out to us at{" "}
+          shot? Reach out to me at{" "}
           <Link
             href="mailto:chengjie.michael.huang@gmail.com"
             className="underline"
