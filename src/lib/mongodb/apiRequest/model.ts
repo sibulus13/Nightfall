@@ -1,6 +1,6 @@
 import mongoose from "mongoose"
 
-const apiSchema = new mongoose.Schema({
+const apiRequest = new mongoose.Schema({
     email: {
         type: String,
         required: true,
@@ -13,4 +13,4 @@ export interface IApiSchema extends mongoose.Document {
     date: Date
 }
 
-export default mongoose.models.apiSchema ?? mongoose.model("apiSchema", apiSchema)
+export default mongoose.models.apiRequest ?? mongoose.model("apiSchema", apiRequest)

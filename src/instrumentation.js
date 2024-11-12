@@ -1,5 +1,5 @@
-import connect from '~/lib/mongodb/db'
+import run from '~/lib/mongodb/db'
 
 export async function register() {
-    await connect()
+    await run().catch(console.dir)
 }

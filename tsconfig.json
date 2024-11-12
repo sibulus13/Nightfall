@@ -13,7 +13,7 @@
     "strict": true,
     "useUnknownInCatchVariables": false,
     "noUncheckedIndexedAccess": true,
-    "checkJs": false,
+    "checkJs": true,
 
     /* Bundled projects */
     "lib": ["dom", "dom.iterable", "ES2022"],

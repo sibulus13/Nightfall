@@ -1,42 +1,25 @@
-// @ts-nocheck
+import mongoose from 'mongoose';
 
-import mongoose from 'mongoose'
-
-const MONGODB_URI = process.env.MONGODB_URI
-
+const MONGODB_URI = process.env.MONGODB_URI!;
 if (!MONGODB_URI) {
-    throw new Error(
-        'Please define the MONGODB_URI environment variable inside .env.local',
-    )
+    throw new Error('Please define the MONGODB_URI environment variable inside .env');
 }
+const clientOptions = { serverApi: { version: '1' as const, strict: true, deprecationErrors: true } };
 
-let cached = global.mongoose || { conn: null, promise: null };
-
-if (!cached) {
-    cached = global.mongoose = { conn: null, promise: null }
-}
-
-async function dbConnect() {
-    if (cached.conn) {
-        return cached.conn
-    }
-    if (!cached.promise) {
-        const opts = {
-            bufferCommands: false,
-        }
-        cached.promise = mongoose.connect(MONGODB_URI, opts).then(mongoose => {
-            console.log('Db connected')
-            return mongoose
-        })
-    }
+async function run() {
     try {
-        cached.conn = await cached.promise
-    } catch (e) {
-        cached.promise = null
-        throw e
+        // Create a Mongoose client with a MongoClientOptions object to set the Stable API version
+        await mongoose.connect(MONGODB_URI, clientOptions);
+        if (mongoose.connection.db) {
+            await mongoose.connection.db.admin().command({ ping: 1 });
+        } else {
+            throw new Error('Database connection is undefined');
+        }
+        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    } finally {
+        // Ensures that the client will close when you finish/error
+        await mongoose.disconnect();
     }
-
-    return cached.conn
 }
 
-export default dbConnect
+export default run;
