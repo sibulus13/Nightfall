@@ -66,7 +66,7 @@ export default function AppPage() {
         predict({ lat, lon }).catch(console.error);
       }
     }
-  }, [prediction, predict]);
+  });
 
   return (
     <TooltipProvider>
@@ -79,9 +79,9 @@ export default function AppPage() {
         </div>
 
         <div className="group grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {prediction.map((entry) => (
+          {prediction.map((entry, i) => (
             <Card
-              key={entry.sunset_time}
+              key={i}
               className={`bg-gradient-to-br ${getScoreGradient(entry.score).color} transition-all duration-300 ease-in-out hover:scale-105 hover:!opacity-100 group-hover:opacity-60`}
               style={{
                 filter: `saturate(${getScoreGradient(entry.score).saturation}%)`,
