@@ -7,7 +7,8 @@ import {
     fetchMarkerPrediction,
     fetchAvailableDates,
     setSelectedDayIndex,
-    resetMap
+    resetMap,
+    clearRateLimit
 } from "~/lib/map/mapSlice";
 import type { RootState } from "~/lib/store";
 
@@ -37,6 +38,8 @@ export const useMapData = ({
         availableDates,
         selectedDayIndex,
         currentLocation,
+        isRateLimited,
+        rateLimitMessage,
     } = useSelector((state: RootState) => state.map);
 
     // Debounce bounds changes to avoid too many API calls
@@ -48,7 +51,7 @@ export const useMapData = ({
             !currentLocation ||
             currentLocation.lat !== initialLocation.lat ||
             currentLocation.lng !== initialLocation.lng
-        )) {
+        ) && !isRateLimited) {
             dispatch(setCurrentLocation(initialLocation));
 
             // Fetch available dates for the new location
@@ -57,7 +60,7 @@ export const useMapData = ({
                 lng: initialLocation.lng,
             }));
         }
-    }, [initialLocation, currentLocation, dispatch]);
+    }, [initialLocation, currentLocation, dispatch, isRateLimited]);
 
     // Generate grid markers when bounds change (placeholder for now)
     const generateMarkers = useCallback((bounds: {
@@ -104,7 +107,7 @@ export const useMapData = ({
 
     // Fetch predictions for new markers
     useEffect(() => {
-        if (markers.length > 0 && availableDates.length > 0) {
+        if (markers.length > 0 && availableDates.length > 0 && !isRateLimited) {
             // Fetch predictions for all markers
             markers.forEach((marker) => {
                 if (!predictions[marker.id]) {
@@ -117,11 +120,11 @@ export const useMapData = ({
                 }
             });
         }
-    }, [markers, selectedDayIndex, availableDates, dispatch]);
+    }, [markers, selectedDayIndex, availableDates, dispatch, isRateLimited]);
 
     // Refresh predictions when selected day changes
     useEffect(() => {
-        if (markers.length > 0 && availableDates.length > 0) {
+        if (markers.length > 0 && availableDates.length > 0 && !isRateLimited) {
             // Clear existing predictions and refetch for new day
             markers.forEach((marker) => {
                 dispatch(fetchMarkerPrediction({
@@ -132,7 +135,7 @@ export const useMapData = ({
                 }));
             });
         }
-    }, [selectedDayIndex, markers, availableDates, dispatch]);
+    }, [selectedDayIndex, markers, availableDates, dispatch, isRateLimited]);
 
     // Calculate which markers to show based on top scores
     const visibleMarkers = useMemo(() => {
@@ -192,6 +195,10 @@ export const useMapData = ({
         dispatch(resetMap());
     }, [dispatch]);
 
+    const clearRateLimit = useCallback(() => {
+        dispatch(clearRateLimit());
+    }, [dispatch]);
+
     return {
         markers,
         predictions,
@@ -200,10 +207,13 @@ export const useMapData = ({
         availableDates,
         selectedDayIndex,
         currentLocation,
+        isRateLimited,
+        rateLimitMessage,
         visibleMarkers,
         dateOptions,
         generateMarkers,
         updateSelectedDay,
         clearMapData,
+        clearRateLimit,
     };
 }; 

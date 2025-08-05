@@ -20,6 +20,8 @@ import { useSelector } from "react-redux";
 import usePrediction from "~/hooks/usePrediction";
 import { useMapData } from "~/hooks/useMapData";
 import { formatDate, formatTime } from "~/lib/time/helper";
+import { clearRateLimit } from "~/lib/map/mapSlice";
+import { useDispatch } from "react-redux";
 
 const getScoreGradient = (score: number) => {
   const baseColors = ["from-orange-300 via-pink-400 to-purple-500"];
@@ -35,6 +37,7 @@ const truncateScore = (score: number, lowerLimit = 0, upperLimit = 100) => {
 
 export default function AppPage() {
   const { predict } = usePrediction();
+  const dispatch = useDispatch();
   const [currentLocation, setCurrentLocation] = useState({ lat: 0, lng: 0 });
   const [activeTab, setActiveTab] = useState("predictions");
 
@@ -53,6 +56,12 @@ export default function AppPage() {
   const prediction = useSelector(
     (state: { prediction: { prediction: Prediction[] } }) =>
       state.prediction.prediction,
+  );
+
+  // Get rate limit state from map slice
+  const { isRateLimited, rateLimitMessage } = useSelector(
+    (state: { map: { isRateLimited: boolean; rateLimitMessage: string } }) =>
+      state.map,
   );
 
   async function setPlace(place: google.maps.places.PlaceResult | null) {
@@ -92,6 +101,39 @@ export default function AppPage() {
   return (
     <TooltipProvider>
       <div className="page justify-center">
+        {/* Rate limit error banner */}
+        {isRateLimited && (
+          <div className="mx-auto mb-4 w-full max-w-6xl">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="h-5 w-5 text-red-400">
+                    <svg fill="currentColor" viewBox="0 0 20 20">
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-red-800">
+                      Rate Limit Exceeded
+                    </h3>
+                    <p className="text-sm text-red-700">{rateLimitMessage}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => dispatch(clearRateLimit())}
+                  className="text-sm font-medium text-red-800 underline hover:text-red-900"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-center p-2 py-4">
           <Locator
             setSelectedPlace={setPlace}

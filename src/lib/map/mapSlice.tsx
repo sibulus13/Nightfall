@@ -16,6 +16,8 @@ interface MapState {
   availableDates: string[];
   selectedDayIndex: number;
   currentLocation: { lat: number; lng: number } | null;
+  isRateLimited: boolean;
+  rateLimitMessage: string;
 }
 
 const initialState: MapState = {
@@ -26,6 +28,8 @@ const initialState: MapState = {
   availableDates: [],
   selectedDayIndex: 0,
   currentLocation: null,
+  isRateLimited: false,
+  rateLimitMessage: "",
 };
 
 // Async thunk to fetch predictions for a marker
@@ -56,6 +60,16 @@ export const fetchAvailableDates = createAsyncThunk(
   async ({ lat, lng }: { lat: number; lng: number }) => {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
     const res = await fetch(url);
+
+    // Check for rate limit error
+    if (res.status === 429) {
+      throw new Error("429 Too Many Requests");
+    }
+
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+
     const forecast = (await res.json()) as { daily?: { time?: string[] } };
     return forecast.daily?.time ?? [];
   },
@@ -85,6 +99,12 @@ export const mapSlice = createSlice({
       state.availableDates = [];
       state.selectedDayIndex = 0;
       state.currentLocation = null;
+      state.isRateLimited = false;
+      state.rateLimitMessage = "";
+    },
+    clearRateLimit: (state) => {
+      state.isRateLimited = false;
+      state.rateLimitMessage = "";
     },
   },
   extraReducers: (builder) => {
@@ -111,6 +131,14 @@ export const mapSlice = createSlice({
         const { markerId } = action.meta.arg;
         state.predictions[markerId] = null;
         state.loadingStates[markerId] = false;
+
+        // Check if it's a rate limit error
+        if (action.error.message?.includes("429")) {
+          state.isRateLimited = true;
+          state.rateLimitMessage =
+            "Too many requests! Please wait a moment before trying again.";
+        }
+
         // Check if all markers are done loading
         const allMarkersLoaded = state.markers.every(
           (marker) => !state.loadingStates[marker.id],
@@ -122,11 +150,27 @@ export const mapSlice = createSlice({
       // Handle fetchAvailableDates
       .addCase(fetchAvailableDates.fulfilled, (state, action) => {
         state.availableDates = action.payload;
+        // Clear rate limit when successful
+        state.isRateLimited = false;
+        state.rateLimitMessage = "";
+      })
+      .addCase(fetchAvailableDates.rejected, (state, action) => {
+        // Check if it's a rate limit error
+        if (action.error.message?.includes("429")) {
+          state.isRateLimited = true;
+          state.rateLimitMessage =
+            "Too many requests! Please wait a moment before trying again.";
+        }
       });
   },
 });
 
-export const { setMarkers, setSelectedDayIndex, setCurrentLocation, resetMap } =
-  mapSlice.actions;
+export const {
+  setMarkers,
+  setSelectedDayIndex,
+  setCurrentLocation,
+  resetMap,
+  clearRateLimit,
+} = mapSlice.actions;
 
 export default mapSlice.reducer;
