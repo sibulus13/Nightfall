@@ -1,7 +1,6 @@
 import "~/styles/globals.css";
 
 import { GeistSans } from "geist/font/sans";
-import GoogleTagManager from "@magicul/next-google-tag-manager";
 import { type Metadata } from "next";
 import { Analytics } from "@vercel/analytics/react";
 import Navbar from "~/components/navbar";
@@ -9,7 +8,6 @@ import Footer from "~/components/footer";
 import { ThemeProvider } from "~/components/themeProvider";
 import StoreProvider from "./StoreProvider";
 import { env } from "process";
-import { Suspense } from "react";
 import { GoogleAnalytics } from "@next/third-parties/google";
 
 export const metadata: Metadata = {

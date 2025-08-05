@@ -11,6 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import WeatherDisplay from "~/components/weatherDisplay";
 import Locator from "~/components/locator";
 import { useSelector } from "react-redux";
@@ -78,63 +79,93 @@ export default function AppPage() {
           />
         </div>
 
-        <div className="group grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {prediction.map((entry, i) => (
-            <Card
-              key={i}
-              className={`bg-gradient-to-br ${getScoreGradient(entry.score).color} transition-all duration-300 ease-in-out hover:scale-105 hover:!opacity-100 group-hover:opacity-60`}
-              style={{
-                filter: `saturate(${getScoreGradient(entry.score).saturation}%)`,
-              }}
+        <Tabs defaultValue="predictions" className="mx-auto w-full max-w-6xl">
+          <TabsList className="mb-6 grid w-full grid-cols-2">
+            <TabsTrigger
+              value="predictions"
+              className="flex items-center gap-2"
             >
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-semibold">
-                  {formatDate(entry.sunset_time + "Z")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <WeatherDisplay weatherCode={entry.weather_code} />
-                  <div className="flex items-center justify-center">
-                    <TbSunset2 className="mb-2 h-12 w-12 text-yellow-300" />
-                    <span className="text-4xl font-bold">
-                      {truncateScore(entry.score) + "%"}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex justify-center gap-1 pt-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center space-x-1">
-                        <Hourglass className="h-6 w-6 text-yellow-300" />
-                        <span className="text-sm">
-                          {formatTime(entry.golden_hour.start)}
+              <TbSunset2 className="h-4 w-4" />
+              Predictions
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2">
+              <Hourglass className="h-4 w-4" />
+              Analytics
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="predictions" className="space-y-4">
+            <div className="group grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {prediction.map((entry, i) => (
+                <Card
+                  key={i}
+                  className={`bg-gradient-to-br ${getScoreGradient(entry.score).color} transition-all duration-300 ease-in-out hover:scale-105 hover:!opacity-100 group-hover:opacity-60`}
+                  style={{
+                    filter: `saturate(${getScoreGradient(entry.score).saturation}%)`,
+                  }}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg font-semibold">
+                      {formatDate(entry.sunset_time + "Z")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <WeatherDisplay weatherCode={entry.weather_code} />
+                      <div className="flex items-center justify-center">
+                        <TbSunset2 className="mb-2 h-12 w-12 text-yellow-300" />
+                        <span className="text-4xl font-bold">
+                          {truncateScore(entry.score) + "%"}
                         </span>
                       </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Golden Hour Start</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  -
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center space-x-1">
-                        <BsSunset className="h-6 w-6 text-orange-300" />
-                        <span className="text-sm">
-                          {formatTime(entry.sunset_time + "Z")}
-                        </span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Sunset Time</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                    </div>
+                    <div className="flex justify-center gap-1 pt-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center space-x-1">
+                            <Hourglass className="h-6 w-6 text-yellow-300" />
+                            <span className="text-sm">
+                              {formatTime(entry.golden_hour.start)}
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Golden Hour Start</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      -
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center space-x-1">
+                            <BsSunset className="h-6 w-6 text-orange-300" />
+                            <span className="text-sm">
+                              {formatTime(entry.sunset_time + "Z")}
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Sunset Time</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-4">
+            <div className="flex h-64 items-center justify-center">
+              <div className="text-center text-muted-foreground">
+                <Hourglass className="mx-auto mb-4 h-12 w-12 opacity-50" />
+                <p className="text-lg font-medium">Analytics Coming Soon</p>
+                <p className="text-sm">
+                  This tab will contain detailed analytics and insights.
+                </p>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </TooltipProvider>
   );
