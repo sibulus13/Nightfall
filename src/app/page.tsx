@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { useRouter } from "next/navigation";
+import { useDispatch } from "react-redux";
 import { CiSaveDown1 } from "react-icons/ci";
 import { GrScorecard } from "react-icons/gr";
 import { FcGlobe } from "react-icons/fc";
@@ -11,6 +12,7 @@ import usePrediction from "~/hooks/usePrediction";
 
 export default function MainPage() {
   const Router = useRouter();
+  const dispatch = useDispatch();
   const { predict } = usePrediction();
 
   function toAppPage() {
@@ -21,6 +23,8 @@ export default function MainPage() {
     const lat = place?.geometry?.location?.lat();
     const lon = place?.geometry?.location?.lng();
     if (lat && lon) {
+      // Set the location in the map slice so it's available when navigating to app page
+      dispatch({ type: "map/setCurrentLocation", payload: { lat, lng: lon } });
       await predict({ lat, lon, onNavigate: toAppPage });
     }
   }
@@ -30,6 +34,11 @@ export default function MainPage() {
       navigator.geolocation.getCurrentPosition((position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
+        // Set the location in the map slice so it's available when navigating to app page
+        dispatch({
+          type: "map/setCurrentLocation",
+          payload: { lat, lng: lon },
+        });
         predict({ lat, lon, onNavigate: toAppPage }).catch(console.error);
       });
     } else {

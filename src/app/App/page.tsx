@@ -58,10 +58,19 @@ export default function AppPage() {
       state.prediction.prediction,
   );
 
-  // Get rate limit state from map slice
-  const { isRateLimited, rateLimitMessage } = useSelector(
-    (state: { map: { isRateLimited: boolean; rateLimitMessage: string } }) =>
-      state.map,
+  // Get rate limit state and current location from map slice
+  const {
+    isRateLimited,
+    rateLimitMessage,
+    currentLocation: mapLocation,
+  } = useSelector(
+    (state: {
+      map: {
+        isRateLimited: boolean;
+        rateLimitMessage: string;
+        currentLocation: { lat: number; lng: number } | null;
+      };
+    }) => state.map,
   );
 
   async function setPlace(place: google.maps.places.PlaceResult | null) {
@@ -88,15 +97,47 @@ export default function AppPage() {
   }
 
   useEffect(() => {
-    if (!prediction) {
-      const lat = Number(localStorage.getItem("lat"));
-      const lon = Number(localStorage.getItem("lon"));
-      if (lat && lon) {
-        setCurrentLocation({ lat, lng: lon });
-        predict({ lat, lon }).catch(console.error);
+    // If we don't have predictions and no current location is set, try to restore from localStorage or map slice
+    if (!prediction && currentLocation.lat === 0 && currentLocation.lng === 0) {
+      // First check if there's a location in the map slice (from main page)
+      if (mapLocation) {
+        setCurrentLocation(mapLocation);
+        predict({ lat: mapLocation.lat, lon: mapLocation.lng }).catch(
+          console.error,
+        );
+      } else {
+        // Fall back to localStorage
+        const lat = Number(localStorage.getItem("lat"));
+        const lon = Number(localStorage.getItem("lon"));
+        if (lat && lon) {
+          setCurrentLocation({ lat, lng: lon });
+          predict({ lat, lon }).catch(console.error);
+        }
       }
     }
-  }, [prediction, predict]);
+    // If we have predictions but no current location is set, set the location from map slice or localStorage
+    else if (
+      prediction &&
+      currentLocation.lat === 0 &&
+      currentLocation.lng === 0
+    ) {
+      if (mapLocation) {
+        setCurrentLocation(mapLocation);
+      } else {
+        const lat = Number(localStorage.getItem("lat"));
+        const lon = Number(localStorage.getItem("lon"));
+        if (lat && lon) {
+          setCurrentLocation({ lat, lng: lon });
+        }
+      }
+    }
+  }, [
+    prediction,
+    predict,
+    currentLocation.lat,
+    currentLocation.lng,
+    mapLocation,
+  ]);
 
   return (
     <TooltipProvider>
@@ -173,59 +214,85 @@ export default function AppPage() {
               {currentLocation.lat !== 0 && currentLocation.lng !== 0 ? (
                 <div className="group grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {prediction.map((entry, i) => (
-                    <Card
-                      key={i}
-                      className={`bg-gradient-to-br ${getScoreGradient(entry.score).color} transition-all duration-300 ease-in-out hover:scale-105 hover:!opacity-100 group-hover:opacity-60`}
-                      style={{
-                        filter: `saturate(${getScoreGradient(entry.score).saturation}%)`,
-                      }}
-                    >
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-lg font-semibold">
-                          {formatDate(entry.sunset_time + "Z")}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-col justify-between">
-                        <div className="flex items-center justify-between">
-                          <WeatherDisplay weatherCode={entry.weather_code} />
-                          <div className="flex items-center justify-center">
-                            <TbSunset2 className="mb-2 h-12 w-12 text-yellow-300" />
-                            <span className="text-4xl font-bold">
-                              {truncateScore(entry.score) + "%"}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex justify-center gap-1 pt-2">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center space-x-1">
-                                <Hourglass className="h-6 w-6 text-yellow-300" />
-                                <span className="text-sm">
-                                  {formatTime(entry.golden_hour.start)}
+                    <Tooltip key={i}>
+                      <TooltipTrigger asChild>
+                        <Card
+                          className={`bg-gradient-to-br ${getScoreGradient(entry.score).color} cursor-pointer transition-all duration-300 ease-in-out hover:scale-105 hover:!opacity-100 group-hover:opacity-60`}
+                          style={{
+                            filter: `saturate(${getScoreGradient(entry.score).saturation}%)`,
+                          }}
+                          onClick={() => {
+                            setActiveTab("map");
+                            // Set the selected day to match this prediction's date
+                            const predictionDate = new Date(
+                              entry.sunset_time + "Z",
+                            );
+                            const today = new Date();
+                            const dayDiff = Math.floor(
+                              (predictionDate.getTime() - today.getTime()) /
+                                (1000 * 60 * 60 * 24),
+                            );
+                            if (dayDiff >= 0 && dayDiff < 7) {
+                              dispatch({
+                                type: "map/setSelectedDayIndex",
+                                payload: dayDiff,
+                              });
+                            }
+                          }}
+                        >
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-lg font-semibold">
+                              {formatDate(entry.sunset_time + "Z")}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="flex flex-col justify-between">
+                            <div className="flex items-center justify-between">
+                              <WeatherDisplay
+                                weatherCode={entry.weather_code}
+                              />
+                              <div className="flex items-center justify-center">
+                                <TbSunset2 className="mb-2 h-12 w-12 text-yellow-300" />
+                                <span className="text-4xl font-bold">
+                                  {truncateScore(entry.score) + "%"}
                                 </span>
                               </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Golden Hour Start</p>
-                            </TooltipContent>
-                          </Tooltip>
-                          -
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center space-x-1">
-                                <BsSunset className="h-6 w-6 text-orange-300" />
-                                <span className="text-sm">
-                                  {formatTime(entry.sunset_time + "Z")}
-                                </span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Sunset Time</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </CardContent>
-                    </Card>
+                            </div>
+                            <div className="flex justify-center gap-1 pt-2">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center space-x-1">
+                                    <Hourglass className="h-6 w-6 text-yellow-300" />
+                                    <span className="text-sm">
+                                      {formatTime(entry.golden_hour.start)}
+                                    </span>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Golden Hour Start</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              -
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center space-x-1">
+                                    <BsSunset className="h-6 w-6 text-orange-300" />
+                                    <span className="text-sm">
+                                      {formatTime(entry.sunset_time + "Z")}
+                                    </span>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Sunset Time</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Click to view this prediction on the map</p>
+                      </TooltipContent>
+                    </Tooltip>
                   ))}
                 </div>
               ) : (
