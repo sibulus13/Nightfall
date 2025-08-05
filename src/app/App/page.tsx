@@ -170,63 +170,78 @@ export default function AppPage() {
           {/* Predictions Tab */}
           {activeTab === "predictions" && (
             <div className="space-y-4">
-              <div className="group grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {prediction.map((entry, i) => (
-                  <Card
-                    key={i}
-                    className={`bg-gradient-to-br ${getScoreGradient(entry.score).color} transition-all duration-300 ease-in-out hover:scale-105 hover:!opacity-100 group-hover:opacity-60`}
-                    style={{
-                      filter: `saturate(${getScoreGradient(entry.score).saturation}%)`,
-                    }}
-                  >
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg font-semibold">
-                        {formatDate(entry.sunset_time + "Z")}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex flex-col justify-between">
-                      <div className="flex items-center justify-between">
-                        <WeatherDisplay weatherCode={entry.weather_code} />
-                        <div className="flex items-center justify-center">
-                          <TbSunset2 className="mb-2 h-12 w-12 text-yellow-300" />
-                          <span className="text-4xl font-bold">
-                            {truncateScore(entry.score) + "%"}
-                          </span>
+              {currentLocation.lat !== 0 && currentLocation.lng !== 0 ? (
+                <div className="group grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {prediction.map((entry, i) => (
+                    <Card
+                      key={i}
+                      className={`bg-gradient-to-br ${getScoreGradient(entry.score).color} transition-all duration-300 ease-in-out hover:scale-105 hover:!opacity-100 group-hover:opacity-60`}
+                      style={{
+                        filter: `saturate(${getScoreGradient(entry.score).saturation}%)`,
+                      }}
+                    >
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg font-semibold">
+                          {formatDate(entry.sunset_time + "Z")}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex flex-col justify-between">
+                        <div className="flex items-center justify-between">
+                          <WeatherDisplay weatherCode={entry.weather_code} />
+                          <div className="flex items-center justify-center">
+                            <TbSunset2 className="mb-2 h-12 w-12 text-yellow-300" />
+                            <span className="text-4xl font-bold">
+                              {truncateScore(entry.score) + "%"}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex justify-center gap-1 pt-2">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="flex items-center space-x-1">
-                              <Hourglass className="h-6 w-6 text-yellow-300" />
-                              <span className="text-sm">
-                                {formatTime(entry.golden_hour.start)}
-                              </span>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Golden Hour Start</p>
-                          </TooltipContent>
-                        </Tooltip>
-                        -
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="flex items-center space-x-1">
-                              <BsSunset className="h-6 w-6 text-orange-300" />
-                              <span className="text-sm">
-                                {formatTime(entry.sunset_time + "Z")}
-                              </span>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Sunset Time</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                        <div className="flex justify-center gap-1 pt-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center space-x-1">
+                                <Hourglass className="h-6 w-6 text-yellow-300" />
+                                <span className="text-sm">
+                                  {formatTime(entry.golden_hour.start)}
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Golden Hour Start</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          -
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center space-x-1">
+                                <BsSunset className="h-6 w-6 text-orange-300" />
+                                <span className="text-sm">
+                                  {formatTime(entry.sunset_time + "Z")}
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Sunset Time</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex h-64 items-center justify-center">
+                  <div className="text-center text-muted-foreground">
+                    <TbSunset2 className="mx-auto mb-4 h-12 w-12 opacity-50" />
+                    <p className="text-lg font-medium">
+                      Select a location to view predictions
+                    </p>
+                    <p className="text-sm">
+                      Use the location selector above to see sunset predictions
+                      for your area.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
