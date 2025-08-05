@@ -1,10 +1,11 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { type Prediction } from "~/lib/sunset/type";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Hourglass } from "lucide-react";
 import { BsSunset } from "react-icons/bs";
 import { TbSunset2 } from "react-icons/tb";
+import { MapPin } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -14,6 +15,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import WeatherDisplay from "~/components/weatherDisplay";
 import Locator from "~/components/locator";
+import SunsetMap from "~/components/sunsetMap";
 import { useSelector } from "react-redux";
 import usePrediction from "~/hooks/usePrediction";
 import { formatDate, formatTime } from "~/lib/time/helper";
@@ -32,6 +34,7 @@ const truncateScore = (score: number, lowerLimit = 0, upperLimit = 100) => {
 
 export default function AppPage() {
   const { predict } = usePrediction();
+  const [currentLocation, setCurrentLocation] = useState({ lat: 0, lng: 0 });
 
   const prediction = useSelector(
     (state: { prediction: { prediction: Prediction[] } }) =>
@@ -44,6 +47,7 @@ export default function AppPage() {
     if (!lat || !lon) {
       return;
     }
+    setCurrentLocation({ lat, lng: lon });
     await predict({ lat, lon });
   }
 
@@ -52,6 +56,7 @@ export default function AppPage() {
       navigator?.geolocation?.getCurrentPosition((position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
+        setCurrentLocation({ lat, lng: lon });
         predict({ lat, lon }).catch(console.error);
       });
     } else {
@@ -64,6 +69,7 @@ export default function AppPage() {
       const lat = Number(localStorage.getItem("lat"));
       const lon = Number(localStorage.getItem("lon"));
       if (lat && lon) {
+        setCurrentLocation({ lat, lng: lon });
         predict({ lat, lon }).catch(console.error);
       }
     }
@@ -79,7 +85,7 @@ export default function AppPage() {
           />
         </div>
 
-        <Tabs defaultValue="predictions" className="mx-auto w-full max-w-6xl">
+        <Tabs defaultValue="map" className="mx-auto w-full max-w-6xl">
           <TabsList className="mb-6 grid w-full grid-cols-2">
             <TabsTrigger
               value="predictions"
@@ -88,9 +94,9 @@ export default function AppPage() {
               <TbSunset2 className="h-4 w-4" />
               Predictions
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <Hourglass className="h-4 w-4" />
-              Analytics
+            <TabsTrigger value="map" className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              Map View
             </TabsTrigger>
           </TabsList>
 
@@ -154,16 +160,23 @@ export default function AppPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="analytics" className="space-y-4">
-            <div className="flex h-64 items-center justify-center">
-              <div className="text-center text-muted-foreground">
-                <Hourglass className="mx-auto mb-4 h-12 w-12 opacity-50" />
-                <p className="text-lg font-medium">Analytics Coming Soon</p>
-                <p className="text-sm">
-                  This tab will contain detailed analytics and insights.
-                </p>
+          <TabsContent value="map" className="space-y-4">
+            {currentLocation.lat !== 0 && currentLocation.lng !== 0 ? (
+              <SunsetMap initialLocation={currentLocation} />
+            ) : (
+              <div className="flex h-64 items-center justify-center">
+                <div className="text-center text-muted-foreground">
+                  <MapPin className="mx-auto mb-4 h-12 w-12 opacity-50" />
+                  <p className="text-lg font-medium">
+                    Select a location to view map
+                  </p>
+                  <p className="text-sm">
+                    Use the location selector above to see sunset predictions on
+                    the map.
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
