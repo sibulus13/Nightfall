@@ -1,17 +1,18 @@
 import { useEffect, useCallback, useMemo } from "react";
 import { useSelector } from "react-redux";
-import { useDebounce } from "./useDebounce";
+
 import {
     setMarkers,
     setCurrentLocation,
-    fetchMarkerPrediction,
     fetchAvailableDates,
+    fetchBatchPredictions,
     setSelectedDayIndex,
     resetMap,
     clearRateLimit
 } from "~/lib/map/mapSlice";
 import type { RootState, AppDispatch } from "~/lib/store";
 import { useDispatch } from "react-redux";
+import { areCoordinatesEqual } from "~/lib/utils";
 
 interface UseMapDataProps {
     initialLocation?: { lat: number; lng: number };
@@ -28,8 +29,6 @@ export const useMapData = ({
 }: UseMapDataProps) => {
     const dispatch = useDispatch<AppDispatch>();
 
-
-
     // Select state from Redux store
     const {
         markers,
@@ -43,15 +42,11 @@ export const useMapData = ({
         rateLimitMessage,
     } = useSelector((state: RootState) => state.map);
 
-    // Debounce bounds changes to avoid too many API calls
-    const debouncedBounds = useDebounce(null, 500); // We'll set this up later
-
     // Update current location when initialLocation changes
     useEffect(() => {
         if (initialLocation && (
             !currentLocation ||
-            currentLocation.lat !== initialLocation.lat ||
-            currentLocation.lng !== initialLocation.lng
+            !areCoordinatesEqual(currentLocation, initialLocation)
         ) && !isRateLimited) {
             dispatch(setCurrentLocation(initialLocation));
             // Fetch available dates for the new location
@@ -62,7 +57,7 @@ export const useMapData = ({
         }
     }, [initialLocation, currentLocation, dispatch, isRateLimited]);
 
-    // Generate grid markers when bounds change (placeholder for now)
+    // Generate grid markers when bounds change
     const generateMarkers = useCallback((bounds: {
         north: number;
         south: number;
@@ -105,37 +100,25 @@ export const useMapData = ({
         dispatch(setMarkers(newMarkers));
     }, [gridRows, gridColumns, dispatch]);
 
-    // Fetch predictions for new markers
+    // Single useEffect to handle all prediction fetching with batching
     useEffect(() => {
         if (markers.length > 0 && availableDates.length > 0 && !isRateLimited) {
-            // Fetch predictions for all markers
-            markers.forEach((marker) => {
-                if (!predictions[marker.id]) {
-                    void dispatch(fetchMarkerPrediction({
-                        markerId: marker.id,
-                        lat: marker.lat,
-                        lng: marker.lng,
-                        dayIndex: selectedDayIndex,
-                    }));
-                }
+            // Find markers that need predictions
+            const markersNeedingPredictions = markers.filter(marker => {
+                const prediction = predictions[marker.id];
+                const isLoading = loadingStates[marker.id];
+                return !prediction && !isLoading;
             });
-        }
-    }, [markers, selectedDayIndex, availableDates, dispatch, isRateLimited]);
 
-    // Refresh predictions when selected day changes
-    useEffect(() => {
-        if (markers.length > 0 && availableDates.length > 0 && !isRateLimited) {
-            // Clear existing predictions and refetch for new day
-            markers.forEach((marker) => {
-                void dispatch(fetchMarkerPrediction({
-                    markerId: marker.id,
-                    lat: marker.lat,
-                    lng: marker.lng,
+            if (markersNeedingPredictions.length > 0) {
+                // Use batch prediction for better performance
+                void dispatch(fetchBatchPredictions({
+                    markers: markersNeedingPredictions,
                     dayIndex: selectedDayIndex,
                 }));
-            });
+            }
         }
-    }, [selectedDayIndex, markers, availableDates, dispatch, isRateLimited]);
+    }, [markers, selectedDayIndex, availableDates, predictions, loadingStates, dispatch, isRateLimited]);
 
     // Calculate which markers to show based on top scores
     const visibleMarkers = useMemo(() => {

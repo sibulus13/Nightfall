@@ -22,6 +22,8 @@ import { useMapData } from "~/hooks/useMapData";
 import { formatDate, formatTime } from "~/lib/time/helper";
 import { clearRateLimit } from "~/lib/map/mapSlice";
 import { useDispatch } from "react-redux";
+import { areCoordinatesEqual } from "~/lib/utils";
+import CacheDebugger from "~/components/CacheDebugger";
 
 const getScoreGradient = (score: number) => {
   const baseColors = ["from-orange-300 via-pink-400 to-purple-500"];
@@ -40,6 +42,7 @@ export default function AppPage() {
   const dispatch = useDispatch();
   const [currentLocation, setCurrentLocation] = useState({ lat: 0, lng: 0 });
   const [activeTab, setActiveTab] = useState("predictions");
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Memoize the initial location to prevent unnecessary re-renders
   const memoizedInitialLocation = useMemo(() => {
@@ -79,6 +82,12 @@ export default function AppPage() {
     if (!lat || !lon) {
       return;
     }
+
+    // Check if this is the same location to avoid unnecessary API calls
+    if (areCoordinatesEqual(currentLocation, { lat, lng: lon })) {
+      return;
+    }
+
     setCurrentLocation({ lat, lng: lon });
     await predict({ lat, lon });
   }
@@ -88,6 +97,12 @@ export default function AppPage() {
       navigator?.geolocation?.getCurrentPosition((position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
+
+        // Check if this is the same location to avoid unnecessary API calls
+        if (areCoordinatesEqual(currentLocation, { lat, lng: lon })) {
+          return;
+        }
+
         setCurrentLocation({ lat, lng: lon });
         predict({ lat, lon }).catch(console.error);
       });
@@ -97,11 +112,12 @@ export default function AppPage() {
   }
 
   useEffect(() => {
-    // If we don't have predictions and no current location is set, try to restore from localStorage or map slice
-    if (!prediction && currentLocation.lat === 0 && currentLocation.lng === 0) {
+    // Only run this effect if we don't have a current location set
+    if (currentLocation.lat === 0 && currentLocation.lng === 0) {
       // First check if there's a location in the map slice (from main page)
       if (mapLocation) {
         setCurrentLocation(mapLocation);
+        // Always fetch predictions for the new location
         predict({ lat: mapLocation.lat, lon: mapLocation.lng }).catch(
           console.error,
         );
@@ -111,33 +127,15 @@ export default function AppPage() {
         const lon = Number(localStorage.getItem("lon"));
         if (lat && lon) {
           setCurrentLocation({ lat, lng: lon });
+          // Always fetch predictions for the new location
           predict({ lat, lon }).catch(console.error);
         }
       }
     }
-    // If we have predictions but no current location is set, set the location from map slice or localStorage
-    else if (
-      prediction &&
-      currentLocation.lat === 0 &&
-      currentLocation.lng === 0
-    ) {
-      if (mapLocation) {
-        setCurrentLocation(mapLocation);
-      } else {
-        const lat = Number(localStorage.getItem("lat"));
-        const lon = Number(localStorage.getItem("lon"));
-        if (lat && lon) {
-          setCurrentLocation({ lat, lng: lon });
-        }
-      }
-    }
-  }, [
-    prediction,
-    predict,
-    currentLocation.lat,
-    currentLocation.lng,
-    mapLocation,
-  ]);
+
+    // Mark as initialized after the first run
+    setIsInitialized(true);
+  }, [currentLocation.lat, currentLocation.lng, mapLocation, predict]);
 
   return (
     <TooltipProvider>
@@ -211,7 +209,11 @@ export default function AppPage() {
           {/* Predictions Tab */}
           {activeTab === "predictions" && (
             <div className="space-y-4">
-              {currentLocation.lat !== 0 && currentLocation.lng !== 0 ? (
+              {isInitialized &&
+              currentLocation.lat !== 0 &&
+              currentLocation.lng !== 0 &&
+              prediction &&
+              prediction.length > 0 ? (
                 <div className="group grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {prediction.map((entry, i) => (
                     <Tooltip key={i}>
@@ -300,11 +302,14 @@ export default function AppPage() {
                   <div className="text-center text-muted-foreground">
                     <TbSunset2 className="mx-auto mb-4 h-12 w-12 opacity-50" />
                     <p className="text-lg font-medium">
-                      Select a location to view predictions
+                      {!isInitialized
+                        ? "Loading..."
+                        : "Select a location to view predictions"}
                     </p>
                     <p className="text-sm">
-                      Use the location selector above to see sunset predictions
-                      for your area.
+                      {!isInitialized
+                        ? "Please wait while we check for saved locations..."
+                        : "Use the location selector above to see sunset predictions for your area."}
                     </p>
                   </div>
                 </div>
@@ -315,18 +320,23 @@ export default function AppPage() {
           {/* Map Tab */}
           {activeTab === "map" && (
             <div className="space-y-4">
-              {currentLocation.lat !== 0 && currentLocation.lng !== 0 ? (
+              {isInitialized &&
+              currentLocation.lat !== 0 &&
+              currentLocation.lng !== 0 ? (
                 <SunsetMap initialLocation={currentLocation} />
               ) : (
                 <div className="flex h-64 items-center justify-center">
                   <div className="text-center text-muted-foreground">
                     <MapPin className="mx-auto mb-4 h-12 w-12 opacity-50" />
                     <p className="text-lg font-medium">
-                      Select a location to view map
+                      {!isInitialized
+                        ? "Loading..."
+                        : "Select a location to view map"}
                     </p>
                     <p className="text-sm">
-                      Use the location selector above to see sunset predictions
-                      on the map.
+                      {!isInitialized
+                        ? "Please wait while we check for saved locations..."
+                        : "Use the location selector above to see sunset predictions on the map."}
                     </p>
                   </div>
                 </div>
@@ -335,6 +345,9 @@ export default function AppPage() {
           )}
         </div>
       </div>
+
+      {/* Cache Debugger - Only show in development */}
+      {process.env.NODE_ENV === "development" && <CacheDebugger />}
     </TooltipProvider>
   );
 }
