@@ -27,6 +27,13 @@ const mapContainerStyle = {
   height: "400px",
 };
 
+// Create a transparent 1x1 pixel image for markers
+const transparentIcon = {
+  url: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+  scaledSize: { width: 1, height: 1 },
+  anchor: { x: 0, y: 0 },
+};
+
 // Helper functions for score display
 const getScoreGradient = (score: number) => {
   const baseColors = ["from-orange-300 via-pink-400 to-purple-500"];
@@ -253,7 +260,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
               key={marker.id}
               position={{ lat: marker.lat, lng: marker.lng }}
               title={title}
-              icon={null}
+              icon={transparentIcon as any}
               label={{
                 text: prediction
                   ? truncateScore(prediction.score)
