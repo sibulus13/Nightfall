@@ -85,7 +85,7 @@ export default function AppPage() {
           />
         </div>
 
-        <Tabs defaultValue="map" className="mx-auto w-full max-w-6xl">
+        <Tabs defaultValue="predictions" className="mx-auto w-full max-w-6xl">
           <TabsList className="mb-6 grid w-full grid-cols-2">
             <TabsTrigger
               value="predictions"
