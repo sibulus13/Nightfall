@@ -37,12 +37,43 @@ const truncateScore = (score: number, lowerLimit = 0, upperLimit = 100) => {
   return score.toFixed(0);
 };
 
+// Function to get location name from coordinates
+const getLocationName = async (lat: number, lng: number) => {
+  try {
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`,
+    );
+    const data = await response.json();
+
+    if (data.results && data.results.length > 0) {
+      const result = data.results[0];
+      // Try to get the most specific location name
+      const locality = result.address_components.find(
+        (component: any) =>
+          component.types.includes("locality") ||
+          component.types.includes("administrative_area_level_1"),
+      );
+
+      if (locality) {
+        return locality.long_name;
+      }
+
+      // Fallback to formatted address
+      return result.formatted_address.split(",")[0];
+    }
+  } catch (error) {
+    console.error("Error fetching location name:", error);
+  }
+  return null;
+};
+
 export default function AppPage() {
   const { predict } = usePrediction();
   const dispatch = useDispatch();
   const [currentLocation, setCurrentLocation] = useState({ lat: 0, lng: 0 });
   const [activeTab, setActiveTab] = useState("predictions");
   const [isInitialized, setIsInitialized] = useState(false);
+  const [locationName, setLocationName] = useState<string>("");
 
   // Memoize the initial location to prevent unnecessary re-renders
   const memoizedInitialLocation = useMemo(() => {
@@ -89,12 +120,22 @@ export default function AppPage() {
     }
 
     setCurrentLocation({ lat, lng: lon });
+
+    // Set location name from place result
+    if (place?.formatted_address) {
+      setLocationName(place.formatted_address.split(",")[0] || "");
+    } else {
+      // Fallback to reverse geocoding
+      const name = await getLocationName(lat, lon);
+      if (name) setLocationName(name);
+    }
+
     await predict({ lat, lon });
   }
 
   async function setUserLocation() {
     if (navigator.geolocation) {
-      navigator?.geolocation?.getCurrentPosition((position) => {
+      navigator?.geolocation?.getCurrentPosition(async (position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
 
@@ -104,6 +145,11 @@ export default function AppPage() {
         }
 
         setCurrentLocation({ lat, lng: lon });
+
+        // Get location name from coordinates
+        const name = await getLocationName(lat, lon);
+        if (name) setLocationName(name);
+
         predict({ lat, lon }).catch(console.error);
       });
     } else {
@@ -121,6 +167,10 @@ export default function AppPage() {
         predict({ lat: mapLocation.lat, lon: mapLocation.lng }).catch(
           console.error,
         );
+        // Get location name
+        getLocationName(mapLocation.lat, mapLocation.lng).then((name) => {
+          if (name) setLocationName(name);
+        });
       } else {
         // Fall back to localStorage
         const lat = Number(localStorage.getItem("lat"));
@@ -129,6 +179,10 @@ export default function AppPage() {
           setCurrentLocation({ lat, lng: lon });
           // Always fetch predictions for the new location
           predict({ lat, lon }).catch(console.error);
+          // Get location name
+          getLocationName(lat, lon).then((name) => {
+            if (name) setLocationName(name);
+          });
         }
       }
     }
@@ -181,6 +235,40 @@ export default function AppPage() {
         </div>
 
         <div className="mx-auto w-full max-w-6xl">
+          {/* Current Location Status */}
+          <div className="mb-4 rounded-lg border bg-card p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Current Location:
+                </span>
+              </div>
+              <div className="text-right">
+                {isInitialized &&
+                currentLocation.lat !== 0 &&
+                currentLocation.lng !== 0 ? (
+                  <div className="text-sm">
+                    {locationName ? (
+                      <span className="font-medium text-foreground">
+                        {locationName}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {currentLocation.lat.toFixed(4)},{" "}
+                        {currentLocation.lng.toFixed(4)}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground">
+                    {!isInitialized ? "Loading..." : "No location selected"}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="mb-6 grid w-full grid-cols-2 rounded-lg bg-muted p-1">
             <button
               onClick={() => setActiveTab("predictions")}
