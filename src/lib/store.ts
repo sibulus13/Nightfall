@@ -1,10 +1,12 @@
 import { configureStore } from '@reduxjs/toolkit'
 import predictionReducer from './prediction/predictionSlice'
+import mapReducer from './map/mapSlice'
 
 export const makeStore = () => {
   return configureStore({
     reducer: {
       prediction: predictionReducer,
+      map: mapReducer,
     }
   })
 }
