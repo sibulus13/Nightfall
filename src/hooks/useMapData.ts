@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useMemo } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import { useDebounce } from "./useDebounce";
 import {
     setMarkers,
@@ -10,7 +10,8 @@ import {
     resetMap,
     clearRateLimit
 } from "~/lib/map/mapSlice";
-import type { RootState } from "~/lib/store";
+import type { RootState, AppDispatch } from "~/lib/store";
+import { useDispatch } from "react-redux";
 
 interface UseMapDataProps {
     initialLocation?: { lat: number; lng: number };
@@ -25,7 +26,7 @@ export const useMapData = ({
     gridColumns = 5,
     topScorePercentage = 20,
 }: UseMapDataProps) => {
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
 
 
 
@@ -53,9 +54,8 @@ export const useMapData = ({
             currentLocation.lng !== initialLocation.lng
         ) && !isRateLimited) {
             dispatch(setCurrentLocation(initialLocation));
-
             // Fetch available dates for the new location
-            dispatch(fetchAvailableDates({
+            void dispatch(fetchAvailableDates({
                 lat: initialLocation.lat,
                 lng: initialLocation.lng,
             }));
@@ -111,7 +111,7 @@ export const useMapData = ({
             // Fetch predictions for all markers
             markers.forEach((marker) => {
                 if (!predictions[marker.id]) {
-                    dispatch(fetchMarkerPrediction({
+                    void dispatch(fetchMarkerPrediction({
                         markerId: marker.id,
                         lat: marker.lat,
                         lng: marker.lng,
@@ -127,7 +127,7 @@ export const useMapData = ({
         if (markers.length > 0 && availableDates.length > 0 && !isRateLimited) {
             // Clear existing predictions and refetch for new day
             markers.forEach((marker) => {
-                dispatch(fetchMarkerPrediction({
+                void dispatch(fetchMarkerPrediction({
                     markerId: marker.id,
                     lat: marker.lat,
                     lng: marker.lng,
@@ -195,7 +195,7 @@ export const useMapData = ({
         dispatch(resetMap());
     }, [dispatch]);
 
-    const clearRateLimit = useCallback(() => {
+    const clearRateLimitHandler = useCallback(() => {
         dispatch(clearRateLimit());
     }, [dispatch]);
 
@@ -214,6 +214,6 @@ export const useMapData = ({
         generateMarkers,
         updateSelectedDay,
         clearMapData,
-        clearRateLimit,
+        clearRateLimit: clearRateLimitHandler,
     };
 }; 
