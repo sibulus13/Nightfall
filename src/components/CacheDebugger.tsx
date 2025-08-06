@@ -5,7 +5,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { clearCache } from "~/lib/map/mapSlice";
 import { useDispatch } from "react-redux";
-import { isLocationCached } from "~/lib/utils";
+
 
 interface CacheDebuggerProps {
   className?: string;
@@ -16,7 +16,7 @@ export default function CacheDebugger({ className }: CacheDebuggerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const { cachedLocations, predictions, markers, isCalculating } = useSelector(
-    (state: any) => state.map,
+    (state: { map: { cachedLocations: string[]; predictions: Record<string, unknown>; markers: unknown[]; isCalculating: boolean } }) => state.map,
   );
 
   const cacheStats = {
@@ -123,7 +123,7 @@ export default function CacheDebugger({ className }: CacheDebuggerProps) {
             <div className="border-t pt-2">
               <div className="mb-1 font-medium">Cached Keys:</div>
               <div className="max-h-20 overflow-y-auto rounded bg-muted p-1 text-xs">
-                {cachedLocations.slice(0, 5).map((key, index) => (
+                {cachedLocations.slice(0, 5).map((key: string, index: number) => (
                   <div key={index} className="truncate">
                     {key}
                   </div>

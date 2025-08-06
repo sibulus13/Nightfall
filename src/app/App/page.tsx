@@ -38,28 +38,38 @@ const truncateScore = (score: number, lowerLimit = 0, upperLimit = 100) => {
 };
 
 // Function to get location name from coordinates
-const getLocationName = async (lat: number, lng: number) => {
+const getLocationName = async (lat: number, lng: number): Promise<string | null> => {
   try {
     const response = await fetch(
       `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`,
     );
-    const data = await response.json();
+    const data = await response.json() as {
+      results?: Array<{
+        address_components: Array<{
+          types: string[];
+          long_name: string;
+        }>;
+        formatted_address: string;
+      }>;
+    };
 
     if (data.results && data.results.length > 0) {
       const result = data.results[0];
-      // Try to get the most specific location name
-      const locality = result.address_components.find(
-        (component: any) =>
-          component.types.includes("locality") ||
-          component.types.includes("administrative_area_level_1"),
-      );
+      if (result) {
+        // Try to get the most specific location name
+        const locality = result.address_components.find(
+          (component) =>
+            component.types.includes("locality") ||
+            component.types.includes("administrative_area_level_1"),
+        );
 
-      if (locality) {
-        return locality.long_name;
+        if (locality) {
+          return locality.long_name;
+        }
+
+        // Fallback to formatted address
+        return result.formatted_address.split(",")[0] ?? null;
       }
-
-      // Fallback to formatted address
-      return result.formatted_address.split(",")[0];
     }
   } catch (error) {
     console.error("Error fetching location name:", error);
@@ -80,10 +90,10 @@ export default function AppPage() {
     return currentLocation.lat !== 0 && currentLocation.lng !== 0
       ? currentLocation
       : undefined;
-  }, [currentLocation.lat, currentLocation.lng]);
+  }, [currentLocation]);
 
   // Initialize map data hook to preload data
-  const mapData = useMapData({
+  useMapData({
     initialLocation: memoizedInitialLocation,
   });
 
@@ -123,7 +133,7 @@ export default function AppPage() {
 
     // Set location name from place result
     if (place?.formatted_address) {
-      setLocationName(place.formatted_address.split(",")[0] || "");
+      setLocationName(place.formatted_address.split(",")[0] ?? "");
     } else {
       // Fallback to reverse geocoding
       const name = await getLocationName(lat, lon);
@@ -133,9 +143,9 @@ export default function AppPage() {
     await predict({ lat, lon });
   }
 
-  async function setUserLocation() {
+  function setUserLocation() {
     if (navigator.geolocation) {
-      navigator?.geolocation?.getCurrentPosition(async (position) => {
+      navigator?.geolocation?.getCurrentPosition((position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
 
@@ -147,8 +157,9 @@ export default function AppPage() {
         setCurrentLocation({ lat, lng: lon });
 
         // Get location name from coordinates
-        const name = await getLocationName(lat, lon);
-        if (name) setLocationName(name);
+        void getLocationName(lat, lon).then((name) => {
+          if (name) setLocationName(name);
+        });
 
         predict({ lat, lon }).catch(console.error);
       });
@@ -168,7 +179,7 @@ export default function AppPage() {
           console.error,
         );
         // Get location name
-        getLocationName(mapLocation.lat, mapLocation.lng).then((name) => {
+        void getLocationName(mapLocation.lat, mapLocation.lng).then((name) => {
           if (name) setLocationName(name);
         });
       } else {
@@ -180,7 +191,7 @@ export default function AppPage() {
           // Always fetch predictions for the new location
           predict({ lat, lon }).catch(console.error);
           // Get location name
-          getLocationName(lat, lon).then((name) => {
+          void getLocationName(lat, lon).then((name) => {
             if (name) setLocationName(name);
           });
         }

@@ -1,5 +1,6 @@
 import { useDispatch } from "react-redux";
 import { getSunsetPrediction } from "~/lib/sunset/sunset";
+import { Prediction } from "~/lib/sunset/type";
 
 interface PredictionProps {
     lat: number;
@@ -8,13 +9,11 @@ interface PredictionProps {
 }
 
 // Cache for main predictions
-interface PredictionCache {
-    [key: string]: {
-        data: any[];
-        timestamp: number;
-        expiresAt: number;
-    };
-}
+type PredictionCache = Record<string, {
+    data: Prediction;
+    timestamp: number;
+    expiresAt: number;
+}>
 
 const predictionCache: PredictionCache = {};
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes

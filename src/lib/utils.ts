@@ -25,7 +25,7 @@ export const isLocationCached = (lat: number, lng: number, cachedLocations: stri
 };
 
 // Debounce utility for API calls
-export const debounce = <T extends (...args: any[]) => any>(
+export const debounce = <T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): ((...args: Parameters<T>) => void) => {
@@ -37,7 +37,7 @@ export const debounce = <T extends (...args: any[]) => any>(
 };
 
 // Throttle utility for API calls
-export const throttle = <T extends (...args: any[]) => any>(
+export const throttle = <T extends (...args: unknown[]) => unknown>(
   func: T,
   limit: number
 ): ((...args: Parameters<T>) => void) => {
@@ -55,7 +55,7 @@ export const throttle = <T extends (...args: any[]) => any>(
 export const areCoordinatesEqual = (
   coord1: { lat: number; lng: number },
   coord2: { lat: number; lng: number },
-  tolerance: number = 0.0001
+  tolerance = 0.0001
 ): boolean => {
   return (
     Math.abs(coord1.lat - coord2.lat) < tolerance &&
