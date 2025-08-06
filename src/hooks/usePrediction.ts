@@ -10,7 +10,7 @@ interface PredictionProps {
 
 // Cache for main predictions
 type PredictionCache = Record<string, {
-    data: Prediction;
+    data: Prediction[];
     timestamp: number;
     expiresAt: number;
 }>
