@@ -207,6 +207,10 @@ export const mapSlice = createSlice({
   reducers: {
     setMarkers: (state, action: { payload: MapMarker[] }) => {
       state.markers = action.payload;
+      // Clear predictions and loading states when markers change to force recalculation
+      state.predictions = {};
+      state.loadingStates = {};
+      state.isCalculating = false;
     },
     setSelectedDayIndex: (state, action: { payload: number }) => {
       state.selectedDayIndex = action.payload;

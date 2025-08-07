@@ -56,12 +56,14 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   topScorePercentage = 20,
 }) => {
   const [center, setCenter] = useState(initialLocation);
+  const [currentZoom, setCurrentZoom] = useState(zoomLevel);
   const [bounds, setBounds] = useState<{
     north: number;
     south: number;
     east: number;
     west: number;
   } | null>(null);
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   // Use global map data
   const {
@@ -80,8 +82,9 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     topScorePercentage,
   });
 
-  // Debounce the bounds to avoid too many API calls
+  // Debounce the bounds and zoom to avoid too many API calls
   const debouncedBounds = useDebounce(bounds, 500);
+  const debouncedZoom = useDebounce(currentZoom, 300);
 
   // Update center when initialLocation changes
   useEffect(() => {
@@ -90,11 +93,23 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     }
   }, [initialLocation]);
 
-  // Generate grid markers when bounds change
+  // Generate grid markers when bounds or zoom change
   useEffect(() => {
     if (!debouncedBounds) return;
-    generateMarkers(debouncedBounds);
-  }, [debouncedBounds, generateMarkers]);
+
+    // Set recalculation state
+    setIsRecalculating(true);
+
+    // Generate markers
+    generateMarkers(debouncedBounds, debouncedZoom);
+
+    // Clear recalculation state after a short delay
+    const timer = setTimeout(() => {
+      setIsRecalculating(false);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [debouncedBounds, debouncedZoom, generateMarkers]);
 
   const onBoundsChanged = useCallback((event: MapCameraChangedEvent) => {
     // Update the center state when user drags the map
@@ -103,6 +118,11 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
         lat: event.detail.center.lat,
         lng: event.detail.center.lng,
       });
+    }
+
+    // Update zoom state
+    if (event.detail.zoom) {
+      setCurrentZoom(event.detail.zoom);
     }
 
     // Update bounds for grid generation
@@ -159,6 +179,17 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
                     <span className="text-lg font-semibold">
                       Calculating sunset scores...
                     </span>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Show recalculation indicator when bounds change but not initial load */}
+            {isRecalculating && !isCalculating && (
+              <div className="absolute right-2 top-2 z-10">
+                <div className="rounded-lg bg-white bg-opacity-90 px-3 py-1 shadow-md">
+                  <div className="flex items-center space-x-2 text-sm text-gray-700">
+                    <div className="h-3 w-3 animate-spin rounded-full border border-gray-300 border-t-orange-500"></div>
+                    <span>Updating markers...</span>
                   </div>
                 </div>
               </div>

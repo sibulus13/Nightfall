@@ -63,8 +63,27 @@ export const useMapData = ({
         south: number;
         east: number;
         west: number;
-    }) => {
+    }, zoom?: number) => {
         if (!bounds) return;
+
+        // Adjust grid density based on zoom level
+        let adjustedGridRows = gridRows;
+        let adjustedGridColumns = gridColumns;
+
+        if (zoom !== undefined) {
+            // At higher zoom levels, use more grid points for better precision
+            // At lower zoom levels, use fewer grid points for better performance
+            if (zoom >= 12) {
+                adjustedGridRows = Math.min(gridRows * 2, 10);
+                adjustedGridColumns = Math.min(gridColumns * 2, 10);
+            } else if (zoom >= 8) {
+                adjustedGridRows = gridRows;
+                adjustedGridColumns = gridColumns;
+            } else {
+                adjustedGridRows = Math.max(gridRows / 2, 3);
+                adjustedGridColumns = Math.max(gridColumns / 2, 3);
+            }
+        }
 
         // Add padding to create some space from the edges
         const padding = 0.15;
@@ -76,16 +95,16 @@ export const useMapData = ({
         const paddedEast = bounds.east - lngPadding;
         const paddedWest = bounds.west + lngPadding;
 
-        const latStep = (paddedNorth - paddedSouth) / (gridRows - 1);
-        const lngStep = (paddedEast - paddedWest) / (gridColumns - 1);
+        const latStep = (paddedNorth - paddedSouth) / (adjustedGridRows - 1);
+        const lngStep = (paddedEast - paddedWest) / (adjustedGridColumns - 1);
 
         const newMarkers: Array<{ lat: number; lng: number; id: string }> = [];
 
-        for (let row = 0; row < gridRows; row++) {
+        for (let row = 0; row < adjustedGridRows; row++) {
             // Stagger each row by offsetting the longitude
             const rowOffset = (row % 2) * (lngStep * 0.5);
 
-            for (let col = 0; col < gridColumns; col++) {
+            for (let col = 0; col < adjustedGridColumns; col++) {
                 const lat = paddedSouth + latStep * row;
                 const lng = paddedWest + lngStep * col + rowOffset;
 
@@ -97,6 +116,7 @@ export const useMapData = ({
             }
         }
 
+        // Clear existing predictions when generating new markers to force recalculation
         dispatch(setMarkers(newMarkers));
     }, [gridRows, gridColumns, dispatch]);
 
