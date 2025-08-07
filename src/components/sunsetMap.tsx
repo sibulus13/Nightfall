@@ -64,6 +64,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     west: number;
   } | null>(null);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [showAllMarkers, setShowAllMarkers] = useState(false);
 
   // Use global map data
   const {
@@ -72,6 +73,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     isCalculating,
     selectedDayIndex,
     visibleMarkers,
+    markers,
     dateOptions,
     generateMarkers,
     updateSelectedDay,
@@ -81,6 +83,9 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     gridColumns,
     topScorePercentage,
   });
+
+  // Determine which markers to show based on toggle state
+  const displayMarkers = showAllMarkers ? markers : visibleMarkers;
 
   // Debounce the bounds and zoom to avoid too many API calls
   const debouncedBounds = useDebounce(bounds, 500);
@@ -135,25 +140,50 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     <div className="space-y-4">
       {/* Date selector dropdown */}
       {
-        <div className="flex items-center justify-start space-x-3">
-          <select
-            value={selectedDayIndex}
-            onChange={(e) => updateSelectedDay(Number(e.target.value))}
-            disabled={isCalculating}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {dateOptions.map((option) => (
-              <option key={option.index} value={option.index}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {isCalculating && (
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-orange-500"></div>
-              <span>Loading predictions...</span>
-            </div>
-          )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <select
+              value={selectedDayIndex}
+              onChange={(e) => updateSelectedDay(Number(e.target.value))}
+              disabled={isCalculating}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {dateOptions.map((option) => (
+                <option key={option.index} value={option.index}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {isCalculating && (
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-orange-500"></div>
+                <span>Loading predictions...</span>
+              </div>
+            )}
+          </div>
+
+          {/* Marker display toggle */}
+          <div className="flex items-center space-x-2">
+            <label className="text-sm font-medium text-gray-700">
+              Show all markers
+            </label>
+            <button
+              onClick={() => setShowAllMarkers(!showAllMarkers)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                showAllMarkers ? "bg-orange-600" : "bg-gray-200"
+              }`}
+              disabled={isCalculating}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  showAllMarkers ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+            <span className="text-xs text-gray-500">
+              {showAllMarkers ? "All" : `Top ${topScorePercentage}%`}
+            </span>
+          </div>
         </div>
       }
 
@@ -162,7 +192,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
           <Map
             style={mapContainerStyle}
             center={center}
-            zoom={zoomLevel}
+            zoom={currentZoom}
             minZoom={minZoom}
             maxZoom={maxZoom}
             gestureHandling={"greedy"}
@@ -194,9 +224,12 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
                 </div>
               </div>
             )}
-            {visibleMarkers.map((marker) => {
+            {displayMarkers.map((marker) => {
               const prediction = predictions[marker.id] ?? null;
               const isLoading = loadingStates[marker.id] ?? false;
+              const isTopMarker = visibleMarkers.some(
+                (vm) => vm.id === marker.id,
+              );
 
               let title = `Grid Point ${marker.id}`;
               if (prediction) {
@@ -219,7 +252,9 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
                         ? "..."
                         : "?",
                     className: prediction
-                      ? `bg-gradient-to-br ${getScoreGradient(prediction.score).color} text-white font-bold rounded-full px-2 py-1 text-xs`
+                      ? showAllMarkers && !isTopMarker
+                        ? "bg-gray-500 text-white font-bold rounded-full px-2 py-1 text-xs opacity-70"
+                        : `bg-gradient-to-br ${getScoreGradient(prediction.score).color} text-white font-bold rounded-full px-2 py-1 text-xs`
                       : "bg-gray-400 text-white font-bold rounded-full px-2 py-1 text-xs",
                   }}
                   onClick={() => {
