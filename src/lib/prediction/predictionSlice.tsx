@@ -9,6 +9,19 @@ const dummyPredictionInstance: Prediction = {
   },
   weather_code: -1,
   sunset_time: "",
+  scores: {
+    score: 0,
+    cloudCoverage: 0,
+    visibility: 0,
+    humidity: 0,
+  },
+  cloud_cover: 0,
+  cloud_cover_low: 0,
+  cloud_cover_mid: 0,
+  cloud_cover_high: 0,
+  visibility: 0,
+  humidity: 0,
+  surface_pressure: 1013.25,
 };
 
 const initialPrediction = Array(6).fill(dummyPredictionInstance);

@@ -5,7 +5,7 @@ import {
 } from "~/lib/sunset/type";
 
 export async function getSunsetPrediction(latitude: number, longitude: number) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,surface_pressure&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
   const res = await fetch(url);
 
   // Check for rate limit error
@@ -76,6 +76,16 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
         forecast.hourly.cloud_cover_low[sunset_end_hourly_index]!,
         interpolateRatio,
       ),
+      cloud_cover_mid: interpolate(
+        forecast.hourly.cloud_cover_mid[sunset_start_hourly_index] ?? 0,
+        forecast.hourly.cloud_cover_mid[sunset_end_hourly_index] ?? 0,
+        interpolateRatio,
+      ),
+      cloud_cover_high: interpolate(
+        forecast.hourly.cloud_cover_high[sunset_start_hourly_index] ?? 0,
+        forecast.hourly.cloud_cover_high[sunset_end_hourly_index] ?? 0,
+        interpolateRatio,
+      ),
       visibility: interpolate(
         forecast.hourly.visibility[sunset_start_hourly_index]!,
         forecast.hourly.visibility[sunset_end_hourly_index]!,
@@ -84,6 +94,11 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
       humidity: interpolate(
         forecast.hourly.relative_humidity_2m[sunset_start_hourly_index]!,
         forecast.hourly.relative_humidity_2m[sunset_end_hourly_index]!,
+        interpolateRatio,
+      ),
+      surface_pressure: interpolate(
+        forecast.hourly.surface_pressure[sunset_start_hourly_index] ?? 1013.25,
+        forecast.hourly.surface_pressure[sunset_end_hourly_index] ?? 1013.25,
         interpolateRatio,
       ),
       weather_code: interpolate(
@@ -100,7 +115,14 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
       weather_code: prediction.weather_code,
       sunset_time: prediction.sunset,
       scores: sunsetScore,
-      // ...prediction,
+      // Detailed weather information
+      cloud_cover: prediction.cloud_cover,
+      cloud_cover_low: prediction.cloud_cover_low,
+      cloud_cover_mid: prediction.cloud_cover_mid,
+      cloud_cover_high: prediction.cloud_cover_high,
+      visibility: prediction.visibility,
+      humidity: prediction.humidity,
+      surface_pressure: prediction.surface_pressure,
     };
     predictions.push(res);
   }
@@ -132,13 +154,44 @@ function interpolate(start: number, end: number, ratio: number, type?: string) {
   return start + (end - start) * ratio;
 }
 
-// Calculate the sunset score based on the prediction
+/**
+ * Calculate the overall sunset quality score based on meteorological conditions
+ *
+ * Sunset quality is determined by how well sunlight can reach the observer and create
+ * the characteristic red/orange colors. The key factors are:
+ *
+ * 1. Cloud Coverage: Affects light scattering and blocking
+ *    - Low clouds (0-2km): Block direct sunlight, generally bad for sunsets
+ *    - Mid clouds (2-6km): Can enhance colors through scattering
+ *    - High clouds (6-12km): Cirrus clouds can create spectacular sunsets
+ *
+ * 2. Visibility: Indicates atmospheric clarity and pollution levels
+ *    - High visibility = clear atmosphere = better sunsets
+ *    - Low visibility often means pollution/haze which can enhance colors paradoxically
+ *    - Very low visibility (<1km) blocks too much light
+ *
+ * 3. Humidity: Affects light scattering and color saturation
+ *    - High humidity scatters more light, reducing color intensity
+ *    - Low humidity allows more direct light transmission
+ *    - Optimal range: 30-60% for vibrant colors
+ *
+ * 4. Air Pressure: Indicates weather patterns and atmospheric stability
+ *    - High pressure = clear skies, stable conditions
+ *    - Low pressure = stormy conditions, more clouds
+ *    - Currently not weighted heavily but could be refined
+ *
+ * The scoring uses a multiplicative approach where each factor can reduce the overall score.
+ * This reflects the reality that any single factor can significantly impact sunset quality.
+ */
 function calculateSunsetScore(prediction: PredictionData) {
   let score = 1;
   const cCScore = cloudCoverageScore(prediction);
   const vsScore = visibilityScore(prediction);
   const hScore = humidityScore(prediction);
-  // TODO calculate air quality score
+  // TODO: Add air quality score when API supports it
+  // Air quality would factor in particulate matter which can enhance sunset colors
+  // but also reduce overall visibility and health impacts
+
   score *= cCScore * vsScore * hScore;
 
   return {
@@ -149,61 +202,143 @@ function calculateSunsetScore(prediction: PredictionData) {
   };
 }
 
-// Calculate the humidity score based on the prediction
-// Inverse relationship between humidity and sunset quality
+/**
+ * Calculate humidity impact on sunset quality
+ *
+ * Humidity affects sunset quality through several mechanisms:
+ *
+ * 1. Light Scattering: Water vapor molecules scatter sunlight, reducing the intensity
+ *    of direct light reaching the observer. This can make colors appear more muted.
+ *
+ * 2. Rayleigh Scattering: The blue component of sunlight is scattered more than red,
+ *    which is why skies appear blue. High humidity can enhance this effect, making
+ *    the remaining light more red/orange but potentially less intense.
+ *
+ * 3. Aerosol Formation: High humidity can lead to the formation of water droplets
+ *    and aerosols that further scatter light.
+ *
+ * 4. Color Saturation: Lower humidity typically results in more vibrant, saturated
+ *    colors because there's less atmospheric interference with the light path.
+ *
+ * Thresholds are based on typical atmospheric conditions:
+ * - <40%: Excellent conditions, minimal scattering
+ * - 40-60%: Good conditions, slight scattering
+ * - 60-80%: Fair conditions, moderate scattering
+ * - >80%: Poor conditions, heavy scattering
+ *
+ * Note: These thresholds may need adjustment based on geographic location and
+ * seasonal variations. Desert regions might have different optimal ranges.
+ */
 function humidityScore(prediction: PredictionData) {
   if (prediction.humidity > 80) {
-    return 0.7;
+    return 0.7; // Heavy scattering, muted colors
   }
   if (prediction.humidity > 60) {
-    return 0.8;
+    return 0.8; // Moderate scattering
   }
   if (prediction.humidity > 40) {
-    return 0.9;
+    return 0.9; // Light scattering
   }
-  return 1;
+  return 1; // Minimal scattering, optimal conditions
 }
 
+/**
+ * Calculate visibility impact on sunset quality
+ *
+ * Visibility is a complex factor that affects sunset quality in multiple ways:
+ *
+ * 1. Atmospheric Clarity: High visibility indicates clear, clean air with minimal
+ *    particulate matter and aerosols. This allows maximum light transmission.
+ *
+ * 2. Pollution Paradox: Ironically, some air pollution can enhance sunset colors
+ *    by scattering light and creating more dramatic red/orange hues. This is why
+ *    urban areas often have spectacular sunsets despite poor air quality.
+ *
+ * 3. Rayleigh Scattering: Clean air scatters blue light more than red, but pollution
+ *    can enhance this effect by providing additional scattering particles.
+ *
+ * 4. Light Path Length: At sunset, light travels through more atmosphere, so any
+ *    scattering effects are amplified. This is why sunsets are more colorful than
+ *    midday sun.
+ *
+ * Threshold Analysis:
+ * - <10km: Poor visibility, likely heavy pollution or weather conditions
+ *   that block too much light despite potential color enhancement
+ * - 10-20km: Moderate visibility, some pollution that may enhance colors
+ *   while still allowing sufficient light transmission
+ * - >20km: Excellent visibility, clear conditions optimal for vibrant sunsets
+ *
+ * Future improvements could incorporate actual air quality data (PM2.5, PM10)
+ * to better model the pollution paradox effect.
+ */
 function visibilityScore(prediction: PredictionData) {
-  // TODO finetune these thresholds
-  // How does air pollution affect visibility? Since air pollution makes for more vibrant sunsets
-  // Obviously too little visibility is bad
-  // Lets assume that 10km visibility is the threshold
-  // and 30km visibility is the threshold
   if (prediction.visibility < 10000) {
-    return 0.7;
+    return 0.7; // Poor visibility, too much light blocking
   }
   if (prediction.visibility < 20000) {
-    return 0.9;
+    return 0.9; // Moderate visibility, some pollution enhancement
   }
-  return 1;
+  return 1; // Excellent visibility, optimal conditions
 }
 
+/**
+ * Calculate cloud coverage impact on sunset quality
+ *
+ * Cloud coverage is the most complex factor affecting sunset quality, as different
+ * cloud types and heights have dramatically different effects:
+ *
+ * 1. Low Clouds (0-2km): Stratus, cumulus, stratocumulus
+ *    - Generally block direct sunlight, creating dull, gray conditions
+ *    - Can completely obscure the sun, preventing any sunset viewing
+ *    - High coverage (>40%) typically results in poor sunset quality
+ *    - Ideal coverage: 10-20% for some texture without blocking light
+ *
+ * 2. Mid Clouds (2-6km): Altocumulus, altostratus
+ *    - Can enhance sunset colors through light scattering
+ *    - Provide interesting textures and patterns
+ *    - Moderate coverage (20-40%) often creates spectacular sunsets
+ *    - Too much coverage can still block too much light
+ *
+ * 3. High Clouds (6-12km): Cirrus, cirrostratus, cirrocumulus
+ *    - Often create the most dramatic sunset effects
+ *    - Cirrus clouds can create "sunset rays" and vibrant colors
+ *    - High coverage can enhance without blocking too much light
+ *    - Ideal for photography and visual appeal
+ *
+ * 4. Total Cloud Coverage: Overall atmospheric conditions
+ *    - Too little (<10%): May lack interesting elements
+ *    - Too much (>90%): Blocks too much light
+ *    - Sweet spot: 30-50% for optimal balance
+ *
+ * The scoring algorithm prioritizes:
+ * - Low cloud coverage (inverse relationship)
+ * - Moderate total coverage (bell curve around 40%)
+ * - Mid/high clouds are currently weighted less but could be enhanced
+ *
+ * Future improvements could include:
+ * - Separate scoring for mid vs high clouds
+ * - Cloud type classification (cirrus vs cumulus)
+ * - Time-of-day specific adjustments
+ */
 function cloudCoverageScore(prediction: PredictionData) {
-  // Sunset is affected by cloud coverage split by low vs mid/high clouds
-  // Too much low cloud coverage (>50%) is bad
-  // Some mid/high cloud coverage (cirrus) can be good
-  // Lets assume that 50% low cloud coverage is the threshold
-  // and 40% mid/high cloud coverage is the threshold
-  // TODO finetune these thresholds
   let score = 1;
-  // calculate overall cloud cover score
-  // Too little or too much cloud coverage is bad
-  // The ideal cloud coverage is around 40%
+
+  // Calculate overall cloud cover score using a bell curve around 40%
+  // This reflects that some clouds are good, but too many block too much light
   if (prediction.cloud_cover > 90 || prediction.cloud_cover < 10) {
-    score *= 0.5;
+    score *= 0.5; // Too much or too little coverage
   } else {
+    // Bell curve: optimal at 40%, decreasing as we move away
     score *= 1 - Math.abs(prediction.cloud_cover - 40) / 100;
   }
 
-  // calculate low cloud cover score
-  // Form an inverse relationship between low cloud coverage and sunset quality
-  // Assuming Cloud coverage above 40% is bad
-  // Assuming ideal low cloud coverage is around 15%
-  // TODO finetune these thresholds
+  // Calculate low cloud cover score (inverse relationship)
+  // Low clouds are generally bad for sunsets as they block direct light
   if (prediction.cloud_cover_low > 40) {
+    // Heavy penalty for high low cloud coverage
     score *= 1 - prediction.cloud_cover_low / 100 + 0.5;
   } else {
+    // Slight penalty for deviation from ideal low coverage (15%)
     score *= 1 - Math.abs(prediction.cloud_cover_low - 15) / 100;
   }
 

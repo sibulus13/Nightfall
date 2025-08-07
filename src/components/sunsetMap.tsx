@@ -191,6 +191,12 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
                       ? `bg-gradient-to-br ${getScoreGradient(prediction.score).color} text-white font-bold rounded-full px-2 py-1 text-xs`
                       : "bg-gray-400 text-white font-bold rounded-full px-2 py-1 text-xs",
                   }}
+                  onClick={() => {
+                    if (prediction) {
+                      // You can add a callback here to show detailed information
+                      console.log("Marker clicked:", prediction);
+                    }
+                  }}
                 />
               );
             })}

@@ -13,7 +13,10 @@ export type WeatherForecast = {
     relative_humidity_2m: number[];
     cloud_cover: number[];
     cloud_cover_low: number[];
+    cloud_cover_mid: number[];
+    cloud_cover_high: number[];
     visibility: number[];
+    surface_pressure: number[];
     weather_code: number[];
   };
 };
@@ -26,6 +29,20 @@ export type Prediction = {
   };
   weather_code: number;
   sunset_time: string;
+  scores: {
+    score: number;
+    cloudCoverage: number;
+    visibility: number;
+    humidity: number;
+  };
+  // Detailed weather information
+  cloud_cover: number;
+  cloud_cover_low: number;
+  cloud_cover_mid: number;
+  cloud_cover_high: number;
+  visibility: number;
+  humidity: number;
+  surface_pressure: number;
 };
 
 export type PredictionData = {
@@ -43,7 +60,10 @@ export type PredictionData = {
   sunset: string;
   cloud_cover: number;
   cloud_cover_low: number;
+  cloud_cover_mid: number;
+  cloud_cover_high: number;
   visibility: number;
   humidity: number;
+  surface_pressure: number;
   weather_code: number;
 };
