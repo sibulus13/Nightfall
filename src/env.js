@@ -17,6 +17,7 @@ export const env = createEnv({
    */
   client: {
     NEXT_PUBLIC_GOOGLE_MAP_ID: z.string(),
+    NEXT_PUBLIC_GOOGLE_TAG_ID: z.string().optional(),
   },
 
   /**
@@ -26,6 +27,7 @@ export const env = createEnv({
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
     NEXT_PUBLIC_GOOGLE_MAP_ID: process.env.NEXT_PUBLIC_GOOGLE_MAP_ID,
+    NEXT_PUBLIC_GOOGLE_TAG_ID: process.env.NEXT_PUBLIC_GOOGLE_TAG_ID,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

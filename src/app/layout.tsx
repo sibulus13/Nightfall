@@ -1,4 +1,4 @@
-import "~/styles/globals.css";
+import "./globals.css";
 
 import { GeistSans } from "geist/font/sans";
 import { type Metadata } from "next";
@@ -7,7 +7,7 @@ import Navbar from "~/components/navbar";
 import Footer from "~/components/footer";
 import { ThemeProvider } from "~/components/themeProvider";
 import StoreProvider from "./StoreProvider";
-import { env } from "process";
+import { env } from "~/env";
 import { GoogleAnalytics } from "@next/third-parties/google";
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   icons: [{ rel: "icon", url: "/icon.ico" }],
 };
 
-const NEXT_PUBLIC_GOOGLE_TAG_ID = env.NEXT_PUBLIC_GOOGLE_TAG_ID!;
+const NEXT_PUBLIC_GOOGLE_TAG_ID = env.NEXT_PUBLIC_GOOGLE_TAG_ID;
 
 export default function RootLayout({
   children,
@@ -38,7 +38,9 @@ export default function RootLayout({
         </ThemeProvider>
       </body>
       <Analytics />
-      <GoogleAnalytics gaId={NEXT_PUBLIC_GOOGLE_TAG_ID} />
+      {NEXT_PUBLIC_GOOGLE_TAG_ID && (
+        <GoogleAnalytics gaId={NEXT_PUBLIC_GOOGLE_TAG_ID} />
+      )}
       {/* TODO google analytics isn't set up properly */}
     </html>
   );

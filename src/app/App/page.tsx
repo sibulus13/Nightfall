@@ -16,6 +16,7 @@ import {
 import WeatherDisplay from "~/components/weatherDisplay";
 import Locator from "~/components/locator";
 import SunsetMap from "~/components/sunsetMap";
+import ExpandablePredictionCard from "~/components/expandablePredictionCard";
 import { useSelector } from "react-redux";
 import usePrediction from "~/hooks/usePrediction";
 import { useMapData } from "~/hooks/useMapData";
@@ -38,12 +39,15 @@ const truncateScore = (score: number, lowerLimit = 0, upperLimit = 100) => {
 };
 
 // Function to get location name from coordinates
-const getLocationName = async (lat: number, lng: number): Promise<string | null> => {
+const getLocationName = async (
+  lat: number,
+  lng: number,
+): Promise<string | null> => {
   try {
     const response = await fetch(
       `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`,
     );
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       results?: Array<{
         address_components: Array<{
           types: string[];
@@ -313,87 +317,35 @@ export default function AppPage() {
               currentLocation.lng !== 0 &&
               prediction &&
               prediction.length > 0 ? (
-                <div className="group grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div
+                  className="group grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                  style={{ alignItems: "center" }}
+                >
                   {prediction.map((entry, i) => (
-                    <Tooltip key={i}>
-                      <TooltipTrigger asChild>
-                        <Card
-                          className={`bg-gradient-to-br ${getScoreGradient(entry.score).color} cursor-pointer transition-all duration-300 ease-in-out hover:scale-105 hover:!opacity-100 group-hover:opacity-60`}
-                          style={{
-                            filter: `saturate(${getScoreGradient(entry.score).saturation}%)`,
-                          }}
-                          onClick={() => {
-                            setActiveTab("map");
-                            // Set the selected day to match this prediction's date
-                            const predictionDate = new Date(
-                              entry.sunset_time + "Z",
-                            );
-                            const today = new Date();
-                            const dayDiff = Math.floor(
-                              (predictionDate.getTime() - today.getTime()) /
-                                (1000 * 60 * 60 * 24),
-                            );
-                            if (dayDiff >= 0 && dayDiff < 7) {
-                              dispatch({
-                                type: "map/setSelectedDayIndex",
-                                payload: dayDiff,
-                              });
-                            }
-                          }}
-                        >
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-lg font-semibold">
-                              {formatDate(entry.sunset_time + "Z")}
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="flex flex-col justify-between">
-                            <div className="flex items-center justify-between">
-                              <WeatherDisplay
-                                weatherCode={entry.weather_code}
-                              />
-                              <div className="flex items-center justify-center">
-                                <TbSunset2 className="mb-2 h-12 w-12 text-yellow-300" />
-                                <span className="text-4xl font-bold">
-                                  {truncateScore(entry.score) + "%"}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex justify-center gap-1 pt-2">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="flex items-center space-x-1">
-                                    <Hourglass className="h-6 w-6 text-yellow-300" />
-                                    <span className="text-sm">
-                                      {formatTime(entry.golden_hour.start)}
-                                    </span>
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Golden Hour Start</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              -
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="flex items-center space-x-1">
-                                    <BsSunset className="h-6 w-6 text-orange-300" />
-                                    <span className="text-sm">
-                                      {formatTime(entry.sunset_time + "Z")}
-                                    </span>
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Sunset Time</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Click to view this prediction on the map</p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <ExpandablePredictionCard
+                      key={i}
+                      prediction={entry}
+                      onMapClick={() => {
+                        setActiveTab("map");
+                        // Set the selected day to match this prediction's date
+                        const predictionDate = new Date(
+                          entry.sunset_time + "Z",
+                        );
+                        const today = new Date();
+                        const dayDiff = Math.floor(
+                          (predictionDate.getTime() - today.getTime()) /
+                            (1000 * 60 * 60 * 24),
+                        );
+                        if (dayDiff >= 0 && dayDiff < 7) {
+                          dispatch({
+                            type: "map/setSelectedDayIndex",
+                            payload: dayDiff,
+                          });
+                        }
+                      }}
+                      getScoreGradient={getScoreGradient}
+                      truncateScore={truncateScore}
+                    />
                   ))}
                 </div>
               ) : (
