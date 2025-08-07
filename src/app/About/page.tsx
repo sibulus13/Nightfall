@@ -103,10 +103,10 @@ const AboutPage = () => {
           Have questions, suggestions, or just want to share your perfect sunset
           shot? Reach out to me at{" "}
           <Link
-            href="mailto:chengjie.michael.huang@gmail.com"
+            href="mailto:info@si8tech.com"
             className="underline"
           >
-            chengjie.michael.huang@gmail.com
+            info@si8tech.com
           </Link>
         </p>
         <p className="pt-4">

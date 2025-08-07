@@ -6,11 +6,8 @@ export default function ContactPage() {
       <p className="text-lg">
         For any inquiries, questions, feedback, or bug report, please contact me
         at:{" "}
-        <Link
-          className="underline"
-          href="mailto:chengjie.michael.huang@gmail.com"
-        >
-          chengjie.michael.huang@gmail.com
+        <Link className="underline" href="mailto:info@si8tech.com">
+          info@si8tech.com
         </Link>
       </p>
     </div>
