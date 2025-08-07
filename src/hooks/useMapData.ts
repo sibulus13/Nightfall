@@ -66,24 +66,9 @@ export const useMapData = ({
     }, zoom?: number) => {
         if (!bounds) return;
 
-        // Adjust grid density based on zoom level
-        let adjustedGridRows = gridRows;
-        let adjustedGridColumns = gridColumns;
-
-        if (zoom !== undefined) {
-            // At higher zoom levels, use more grid points for better precision
-            // At lower zoom levels, use fewer grid points for better performance
-            if (zoom >= 12) {
-                adjustedGridRows = Math.min(gridRows * 2, 10);
-                adjustedGridColumns = Math.min(gridColumns * 2, 10);
-            } else if (zoom >= 8) {
-                adjustedGridRows = gridRows;
-                adjustedGridColumns = gridColumns;
-            } else {
-                adjustedGridRows = Math.max(gridRows / 2, 3);
-                adjustedGridColumns = Math.max(gridColumns / 2, 3);
-            }
-        }
+        // Use consistent grid size regardless of zoom level
+        const adjustedGridRows = gridRows;
+        const adjustedGridColumns = gridColumns;
 
         // Add padding to create some space from the edges
         const padding = 0.15;
@@ -123,10 +108,18 @@ export const useMapData = ({
     // Single useEffect to handle all prediction fetching with batching
     useEffect(() => {
         if (markers.length > 0 && availableDates.length > 0 && !isRateLimited) {
-            // Find markers that need predictions
+            // When selectedDayIndex changes, we need to refetch all predictions
+            // When markers change, we only fetch for new markers
             const markersNeedingPredictions = markers.filter(marker => {
                 const prediction = predictions[marker.id];
                 const isLoading = loadingStates[marker.id];
+                // If we have a prediction, check if it's for the current selected day
+                if (prediction) {
+                    const predictionDate = new Date(prediction.sunset_time + "Z");
+                    const selectedDate = new Date(availableDates[selectedDayIndex] + "T00:00:00");
+                    const isSameDay = predictionDate.toDateString() === selectedDate.toDateString();
+                    return !isSameDay && !isLoading;
+                }
                 return !prediction && !isLoading;
             });
 

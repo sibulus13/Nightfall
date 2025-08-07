@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { type Prediction } from "~/lib/sunset/type";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Hourglass } from "lucide-react";
@@ -88,6 +88,7 @@ export default function AppPage() {
   const [activeTab, setActiveTab] = useState("predictions");
   const [isInitialized, setIsInitialized] = useState(false);
   const [locationName, setLocationName] = useState<string>("");
+  const mapLocationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Memoize the initial location to prevent unnecessary re-renders
   const memoizedInitialLocation = useMemo(() => {
@@ -172,6 +173,34 @@ export default function AppPage() {
     }
   }
 
+  // Handle location changes from the map (debounced to avoid too many API calls)
+  const handleMapLocationChange = useCallback(
+    (location: { lat: number; lng: number }) => {
+      // Check if this is the same location to avoid unnecessary API calls
+      if (areCoordinatesEqual(currentLocation, location)) {
+        return;
+      }
+
+      setCurrentLocation(location);
+
+      // Clear any existing timeout
+      if (mapLocationTimeoutRef.current) {
+        clearTimeout(mapLocationTimeoutRef.current);
+      }
+
+      // Debounce the API calls to avoid too many requests while dragging
+      mapLocationTimeoutRef.current = setTimeout(async () => {
+        // Get location name from coordinates
+        const name = await getLocationName(location.lat, location.lng);
+        if (name) setLocationName(name);
+
+        // Fetch predictions for the new location
+        await predict({ lat: location.lat, lon: location.lng });
+      }, 1000); // 1 second debounce
+    },
+    [currentLocation, predict],
+  );
+
   useEffect(() => {
     // Only run this effect if we don't have a current location set
     if (currentLocation.lat === 0 && currentLocation.lng === 0) {
@@ -205,6 +234,15 @@ export default function AppPage() {
     // Mark as initialized after the first run
     setIsInitialized(true);
   }, [currentLocation.lat, currentLocation.lng, mapLocation, predict]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (mapLocationTimeoutRef.current) {
+        clearTimeout(mapLocationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <TooltipProvider>
@@ -246,44 +284,11 @@ export default function AppPage() {
           <Locator
             setSelectedPlace={setPlace}
             handleLocationClick={setUserLocation}
+            value={locationName}
           />
         </div>
 
         <div className="mx-auto w-full max-w-6xl">
-          {/* Current Location Status */}
-          <div className="mb-4 rounded-lg border bg-card p-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-muted-foreground">
-                  Current Location:
-                </span>
-              </div>
-              <div className="text-right">
-                {isInitialized &&
-                currentLocation.lat !== 0 &&
-                currentLocation.lng !== 0 ? (
-                  <div className="text-sm">
-                    {locationName ? (
-                      <span className="font-medium text-foreground">
-                        {locationName}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        {currentLocation.lat.toFixed(4)},{" "}
-                        {currentLocation.lng.toFixed(4)}
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-sm text-muted-foreground">
-                    {!isInitialized ? "Loading..." : "No location selected"}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
           <div className="mb-6 grid w-full grid-cols-2 rounded-lg bg-muted p-1">
             <button
               onClick={() => setActiveTab("predictions")}
@@ -374,7 +379,10 @@ export default function AppPage() {
               {isInitialized &&
               currentLocation.lat !== 0 &&
               currentLocation.lng !== 0 ? (
-                <SunsetMap initialLocation={currentLocation} />
+                <SunsetMap
+                  initialLocation={currentLocation}
+                  onLocationChange={handleMapLocationChange}
+                />
               ) : (
                 <div className="flex h-64 items-center justify-center">
                   <div className="text-center text-muted-foreground">

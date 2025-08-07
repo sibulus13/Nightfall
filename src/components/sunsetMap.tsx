@@ -19,6 +19,7 @@ interface SunsetMapProps {
   gridRows?: number;
   gridColumns?: number;
   topScorePercentage?: number; // Percentage of top scores to show (default 20%)
+  onLocationChange?: (location: { lat: number; lng: number }) => void;
 }
 
 const mapContainerStyle = {
@@ -54,6 +55,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   gridRows = 5,
   gridColumns = 5,
   topScorePercentage = 20,
+  onLocationChange,
 }) => {
   const [center, setCenter] = useState(initialLocation);
   const [currentZoom, setCurrentZoom] = useState(zoomLevel);
@@ -116,25 +118,34 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     return () => clearTimeout(timer);
   }, [debouncedBounds, debouncedZoom, generateMarkers]);
 
-  const onBoundsChanged = useCallback((event: MapCameraChangedEvent) => {
-    // Update the center state when user drags the map
-    if (event.detail.center) {
-      setCenter({
-        lat: event.detail.center.lat,
-        lng: event.detail.center.lng,
-      });
-    }
+  const onBoundsChanged = useCallback(
+    (event: MapCameraChangedEvent) => {
+      // Update the center state when user drags the map
+      if (event.detail.center) {
+        const newCenter = {
+          lat: event.detail.center.lat,
+          lng: event.detail.center.lng,
+        };
+        setCenter(newCenter);
 
-    // Update zoom state
-    if (event.detail.zoom) {
-      setCurrentZoom(event.detail.zoom);
-    }
+        // Notify parent component of location change
+        if (onLocationChange) {
+          onLocationChange(newCenter);
+        }
+      }
 
-    // Update bounds for grid generation
-    if (event.detail.bounds) {
-      setBounds(event.detail.bounds);
-    }
-  }, []);
+      // Update zoom state
+      if (event.detail.zoom) {
+        setCurrentZoom(event.detail.zoom);
+      }
+
+      // Update bounds for grid generation
+      if (event.detail.bounds) {
+        setBounds(event.detail.bounds);
+      }
+    },
+    [onLocationChange],
+  );
 
   return (
     <div className="space-y-4">
