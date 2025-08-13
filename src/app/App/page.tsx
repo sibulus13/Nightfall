@@ -112,12 +112,14 @@ export default function AppPage() {
     isRateLimited,
     rateLimitMessage,
     currentLocation: mapLocation,
+    availableDates,
   } = useSelector(
     (state: {
       map: {
         isRateLimited: boolean;
         rateLimitMessage: string;
         currentLocation: { lat: number; lng: number } | null;
+        availableDates: string[];
       };
     }) => state.map,
   );
@@ -336,15 +338,23 @@ export default function AppPage() {
                         const predictionDate = new Date(
                           entry.sunset_time + "Z",
                         );
-                        const today = new Date();
-                        const dayDiff = Math.floor(
-                          (predictionDate.getTime() - today.getTime()) /
-                            (1000 * 60 * 60 * 24),
+
+                        // Use date-only comparison to match map view logic
+                        const predictionDateOnly =
+                          predictionDate.toDateString();
+
+                        // Find the day index by comparing with available dates
+                        const dayIndex = availableDates.findIndex(
+                          (dateString: string) => {
+                            const date = new Date(dateString + "T00:00:00");
+                            return date.toDateString() === predictionDateOnly;
+                          },
                         );
-                        if (dayDiff >= 0 && dayDiff < 7) {
+
+                        if (dayIndex >= 0 && dayIndex < 7) {
                           dispatch({
                             type: "map/setSelectedDayIndex",
-                            payload: dayDiff,
+                            payload: dayIndex,
                           });
                         }
                       }}
