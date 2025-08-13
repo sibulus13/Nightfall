@@ -5,7 +5,7 @@ import {
 } from "~/lib/sunset/type";
 
 export async function getSunsetPrediction(latitude: number, longitude: number) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,surface_pressure&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,surface_pressure&daily=sunrise,sunset,daylight_duration,sunshine_duration&timezone=auto`;
   const res = await fetch(url);
 
   // Check for rate limit error
