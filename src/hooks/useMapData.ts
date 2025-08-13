@@ -162,8 +162,10 @@ export const useMapData = ({
 
     // Generate date options for the dropdown
     const dateOptions = useMemo(() => {
+        const today = new Date();
+
         return availableDates.map((dateString, index) => {
-            const date = new Date(dateString + "T00:00:00");
+            const date = new Date(dateString);
             const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
             const monthDay = date.toLocaleDateString("en-US", {
                 month: "short",
@@ -171,7 +173,6 @@ export const useMapData = ({
             });
 
             // Check if this is today
-            const today = new Date();
             const isToday = date.toDateString() === today.toDateString();
 
             return {

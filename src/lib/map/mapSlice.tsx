@@ -117,7 +117,7 @@ export const fetchAvailableDates = createAsyncThunk(
         // Extract dates from the cached predictions
         const dates = cachedData
           .map((pred) => {
-            const date = new Date(pred.sunset_time + "Z");
+            const date = new Date(pred.sunset_time); // Use timezone-aware date
             return date.toISOString().split("T")[0];
           })
           .filter((date): date is string => date !== undefined);
@@ -139,7 +139,9 @@ export const fetchAvailableDates = createAsyncThunk(
     }
 
     const forecast = (await res.json()) as { daily?: { time?: string[] } };
-    return forecast.daily?.time ?? [];
+    const dates = forecast.daily?.time ?? [];
+
+    return dates;
   },
 );
 

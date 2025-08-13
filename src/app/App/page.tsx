@@ -336,7 +336,7 @@ export default function AppPage() {
                         setActiveTab("map");
                         // Set the selected day to match this prediction's date
                         const predictionDate = new Date(
-                          entry.sunset_time + "Z",
+                          entry.sunset_time, // Use timezone-aware date
                         );
 
                         // Use date-only comparison to match map view logic

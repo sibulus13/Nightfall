@@ -84,7 +84,7 @@ export default function ExpandablePredictionCard({
         >
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-semibold">
-              {formatDate(prediction.sunset_time + "Z")}
+              {formatDate(prediction.sunset_time)}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex min-h-[200px] flex-col justify-between">
@@ -126,7 +126,7 @@ export default function ExpandablePredictionCard({
                     <div className="flex items-center space-x-1">
                       <BsSunset className="h-6 w-6 text-orange-300" />
                       <span className="text-sm">
-                        {formatTime(prediction.sunset_time + "Z")}
+                        {formatTime(prediction.sunset_time)}
                       </span>
                     </div>
                   </TooltipTrigger>

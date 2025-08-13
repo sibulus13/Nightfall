@@ -135,7 +135,7 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
 // Calculate the golden hour based on the sunset time and daylight duration
 function calculateGoldenHour(sunset: string, daylight_duration: number) {
   const goldenHourDuration = (daylight_duration / 60 / 12) * 0.9; // 5% of daylight duration
-  const sunsetDate = new Date(sunset + "Z"); // set as UTC
+  const sunsetDate = new Date(sunset); // Use timezone-aware date from API
   const goldenHour = new Date(sunsetDate.getTime());
   goldenHour.setMinutes(goldenHour.getMinutes() - goldenHourDuration);
   const goldenHourString = goldenHour.toISOString();
