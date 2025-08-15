@@ -604,13 +604,13 @@ function particulateScore(prediction: PredictionData) {
 
   // Primary scoring based on PM2.5 levels
   if (pm2_5 > 70) {
-    return 0.25; // Extremely high pollution - very poor conditions
+    return 0.4; // Extremely high pollution - very poor conditions
   }
   if (pm2_5 > 55) {
-    return 0.4; // Very high pollution - poor conditions and health risks
+    return 0.6; // Very high pollution - poor conditions and health risks
   }
   if (pm2_5 > 35) {
-    return 0.6; // High pollution - reduced visibility despite potential color enhancement
+    return 0.85; // High pollution - reduced visibility despite potential color enhancement
   }
   if (pm2_5 > 15) {
     return 1; // Moderate pollution - optimal sunset enhancement
