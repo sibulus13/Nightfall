@@ -1,19 +1,24 @@
-# Nightfalls - Sunset Quality Forecast
+# Nightfalls - Best Sunset Times & Golden Hour Predictions Worldwide
 
-A web application that provides location-based weekly sunset quality forecasts with interactive maps and detailed predictions.
+**Find the perfect sunset times, golden hour predictions, and sunset quality forecasts for any location worldwide.**
+
+Nightfalls is your ultimate companion for sunset planning, photography, and viewing. Get accurate sunset predictions, golden hour timing, weather conditions, and quality scores to capture stunning sunset photos anywhere in the world.
 
 ## Live Site
 
 https://www.nightfalls.ca/
 
-## Features
+## 🌅 Key Features
 
-- **Sunset Score Predictions**: Get weekly sunset quality forecasts for any location
-- **Interactive Map View**: Visualize sunset scores across a grid with Google Maps integration
-- **Global Coverage**: Works worldwide from Vancouver to Sydney
-- **Photographer-Friendly**: Includes golden hour timing and weather conditions
-- **Real-time Location**: Use your current location or search for any place
-- **Responsive Design**: Works on desktop and mobile devices
+- **Accurate Sunset Predictions**: Get precise sunset times and quality forecasts for any location
+- **Golden Hour Calculator**: Perfect timing for photographers with detailed golden hour predictions
+- **Interactive Sunset Map**: Visualize sunset quality scores across locations with Google Maps
+- **Global Sunset Coverage**: Works worldwide - from Hawaii beaches to Swiss mountains
+- **Weather-Integrated Forecasts**: Sunset quality scores based on weather conditions and atmospheric factors
+- **Photographer's Toolkit**: Golden hour timing, weather forecasts, and sunset quality scores
+- **Real-time Location**: Use GPS or search any location for instant sunset predictions
+- **Weekly Sunset Planning**: Plan your week with detailed 7-day sunset forecasts
+- **Mobile-Optimized**: Perfect sunset planning on any device
 
 ## Tech Stack
 

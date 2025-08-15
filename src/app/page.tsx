@@ -52,15 +52,18 @@ export default function MainPage() {
         {/* Janky lg-w screen to full screen without scroll bar */}
         {/* Headline */}
         <div className="flex grow flex-col items-center justify-center">
-          <h1 className="text-3xl">
-            Weekly
+          <h1 className="text-center text-4xl font-bold md:text-5xl">
+            Find the Perfect
             <span className="bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">
               {" "}
-              Sunset{" "}
+              Sunset Times{" "}
             </span>
-            Quality Forecasts
+            & Golden Hour
           </h1>
-          <p>Never miss another perfect sunset near you.</p>
+          <p className="mt-4 max-w-2xl text-center text-lg md:text-xl">
+            Get accurate sunset predictions, golden hour timing, and weather
+            forecasts to capture stunning sunset photos anywhere in the world.
+          </p>
           <br></br>
           <Locator
             setSelectedPlace={setPlace}
@@ -75,26 +78,66 @@ export default function MainPage() {
         </button>
       </div>
       {/* Features */}
-      <div className="flex flex-col items-center pt-10" id="features-section">
-        <GrScorecard className="h-24 w-24" />
-        <h2 className="mb-2 border-b p-1 pt-4">Sunset Score</h2>
-        Nightfalls provides location-based weekly sunset quality forecasts.
-        Providing a holisttic score to easily visualize the quality of the
-        sunset for the week in a single glance.
+      <div className="flex flex-col items-center pt-16" id="features-section">
+        <h2 className="mb-8 text-center text-3xl font-bold">
+          Why Choose Nightfalls for Sunset Planning?
+        </h2>
+
+        <div className="grid w-full max-w-6xl gap-8 px-4 md:grid-cols-3">
+          <div className="flex flex-col items-center text-center">
+            <GrScorecard className="mb-4 h-20 w-20 text-orange-500" />
+            <h3 className="mb-3 text-xl font-semibold">
+              Accurate Sunset Scores
+            </h3>
+            <p className="leading-relaxed text-gray-600">
+              Get precise sunset quality predictions with our advanced scoring
+              system. Know exactly when the best sunset times are for any
+              location, with detailed weather conditions and atmospheric quality
+              assessments.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center text-center">
+            <FcGlobe className="mb-4 h-20 w-20" />
+            <h3 className="mb-3 text-xl font-semibold">Worldwide Coverage</h3>
+            <p className="leading-relaxed text-gray-600">
+              From the beaches of Hawaii to the mountains of Switzerland, our
+              sunset predictions work globally. Find the best sunset viewing
+              spots and golden hour times anywhere in the world.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center text-center">
+            <FcOldTimeCamera className="mb-4 h-20 w-20" />
+            <h3 className="mb-3 text-xl font-semibold">Photographer's Dream</h3>
+            <p className="leading-relaxed text-gray-600">
+              Perfect for photographers! Get golden hour timing, weather
+              forecasts, and sunset quality scores to plan your shoots. Never
+              miss the perfect lighting conditions for stunning sunset
+              photography.
+            </p>
+          </div>
+        </div>
       </div>
-      <div className="flex flex-col items-center">
-        <FcGlobe className="h-24 w-24" />
-        <h2 className="mb-2 border-b p-1 pt-4">Global Predictions</h2>
-        From Vancouver, Canada, to Sydney, Australia, Nightfalls provides sunset
-        quality forecasts for locations around the world.
-      </div>
-      <div className="flex flex-col items-center">
-        <FcOldTimeCamera className="h-24 w-24" />
-        <h2 className="mb-2 border-b p-1">For Photographers</h2>
-        Lighting is a key factor in photography. Nightfalls provides information
-        on each day&apos;s golden hour as well as weather condition to help
-        photographers plan their shoots, so you can always find the perfect
-        condition to capture the perfect moment!
+
+      {/* Story Section */}
+      <div className="flex flex-col items-center pb-8 pt-16">
+        <div className="max-w-4xl px-4 text-center">
+          <h2 className="mb-6 text-2xl font-bold">The Perfect Sunset Awaits</h2>
+          <p className="mb-6 text-lg leading-relaxed text-gray-700">
+            Whether you're a professional photographer seeking the perfect
+            golden hour, a traveler wanting to experience breathtaking sunsets,
+            or simply someone who loves to watch the sky paint itself in
+            brilliant colors, Nightfalls is your ultimate sunset companion.
+          </p>
+          <p className="text-lg leading-relaxed text-gray-700">
+            Our advanced algorithms analyze weather patterns, atmospheric
+            conditions, and seasonal factors to give you the most accurate
+            sunset predictions available. Plan your sunset viewing, photography
+            sessions, or romantic evenings with confidence, knowing exactly when
+            nature will put on its most spectacular show.
+          </p>
+        </div>
       </div>
       <br></br>
     </div>

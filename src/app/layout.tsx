@@ -11,8 +11,58 @@ import { env } from "~/env";
 import { GoogleAnalytics } from "@next/third-parties/google";
 
 export const metadata: Metadata = {
-  title: "Nightfalls | Sunset Quality Forecast",
-  description: "A dashboard for predicting weekly sunset quality",
+  title: "Nightfalls - Best Sunset Times & Golden Hour Predictions Worldwide",
+  description:
+    "Find the perfect sunset times, golden hour predictions, and sunset quality forecasts for any location worldwide. Get weekly sunset scores, photography timing, and weather conditions to capture stunning sunset photos.",
+  keywords:
+    "sunset times, golden hour, sunset predictions, sunset photography, sunset forecast, best sunset locations, sunset quality, sunset score, sunset timing, sunset weather, sunset app, sunset calculator, sunset finder, sunset planner, sunset photography tips, sunset colors, sunset viewing, sunset spots, sunset schedule, sunset calendar, sunset tracker",
+  authors: [{ name: "Nightfalls" }],
+  creator: "Nightfalls",
+  publisher: "Nightfalls",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  metadataBase: new URL("https://www.nightfalls.ca"),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Nightfalls - Best Sunset Times & Golden Hour Predictions Worldwide",
+    description:
+      "Find the perfect sunset times, golden hour predictions, and sunset quality forecasts for any location worldwide. Get weekly sunset scores, photography timing, and weather conditions to capture stunning sunset photos.",
+    url: "https://www.nightfalls.ca",
+    siteName: "Nightfalls",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Nightfalls - Sunset Quality Forecast",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Nightfalls - Best Sunset Times & Golden Hour Predictions Worldwide",
+    description:
+      "Find the perfect sunset times, golden hour predictions, and sunset quality forecasts for any location worldwide.",
+    images: ["/og-image.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   icons: [{ rel: "icon", url: "/icon.ico" }],
 };
 
