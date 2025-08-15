@@ -14,6 +14,7 @@ const dummyPredictionInstance: Prediction = {
     cloudCoverage: 0,
     visibility: 0,
     humidity: 0,
+    pressure: 0,
   },
   cloud_cover: 0,
   cloud_cover_low: 0,

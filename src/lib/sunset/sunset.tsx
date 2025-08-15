@@ -175,31 +175,106 @@ function interpolate(start: number, end: number, ratio: number, type?: string) {
  *    - Low humidity allows more direct light transmission
  *    - Optimal range: 30-60% for vibrant colors
  *
- * 4. Air Pressure: Indicates weather patterns and atmospheric stability
- *    - High pressure = clear skies, stable conditions
- *    - Low pressure = stormy conditions, more clouds
- *    - Currently not weighted heavily but could be refined
+ * 4. Atmospheric Pressure: Indicates weather patterns and atmospheric stability
+ *    - High pressure (>1020 hPa): Clear skies, stable conditions, optimal for sunsets
+ *    - Normal pressure (1010-1020 hPa): Typical fair weather conditions
+ *    - Low pressure (<1010 hPa): Unstable conditions, likely cloudy/stormy
+ *    - Very low pressure (<990 hPa): Poor conditions, stormy weather likely
  *
  * The scoring uses a multiplicative approach where each factor can reduce the overall score.
  * This reflects the reality that any single factor can significantly impact sunset quality.
+ * Pressure is particularly important as it correlates strongly with overall weather patterns
+ * and atmospheric stability that affect all other factors.
  */
 function calculateSunsetScore(prediction: PredictionData) {
   let score = 1;
   const cCScore = cloudCoverageScore(prediction);
   const vsScore = visibilityScore(prediction);
   const hScore = humidityScore(prediction);
+  const pScore = pressureScore(prediction);
   // TODO: Add air quality score when API supports it
   // Air quality would factor in particulate matter which can enhance sunset colors
   // but also reduce overall visibility and health impacts
 
-  score *= cCScore * vsScore * hScore;
+  score *= cCScore * vsScore * hScore * pScore;
 
   return {
     score: Math.round(score * 100),
     cloudCoverage: Math.round(cCScore * 100),
     visibility: Math.round(vsScore * 100),
     humidity: Math.round(hScore * 100),
+    pressure: Math.round(pScore * 100),
   };
+}
+
+/**
+ * Calculate atmospheric pressure impact on sunset quality
+ *
+ * Atmospheric pressure is a crucial indicator of weather patterns and atmospheric
+ * stability that significantly affects sunset quality through multiple mechanisms:
+ *
+ * 1. Weather Pattern Indication:
+ *    - High pressure (1013-1030 hPa): Associated with clear, stable conditions
+ *      and descending air masses that suppress cloud formation
+ *    - Low pressure (980-1013 hPa): Associated with rising air, increased cloud
+ *      formation, and potentially stormy conditions
+ *    - Very low pressure (<980 hPa): Often indicates severe weather systems
+ *
+ * 2. Atmospheric Stability:
+ *    - High pressure creates stable atmospheric conditions with minimal turbulence
+ *    - Stable air reduces light scattering and allows for clearer, more vibrant sunsets
+ *    - Unstable conditions (low pressure) can create atmospheric mixing that
+ *      enhances scattering and reduces color intensity
+ *
+ * 3. Cloud Formation Influence:
+ *    - High pressure typically suppresses cloud formation, leading to clearer skies
+ *    - Low pressure promotes cloud development, which can block or enhance sunset colors
+ *    - The relationship between pressure and clouds is complex and location-dependent
+ *
+ * 4. Air Quality Correlation:
+ *    - High pressure often correlates with better air quality due to descending air
+ *    - Low pressure can trap pollutants and create hazy conditions
+ *    - Cleaner air allows for more vibrant, less scattered sunset colors
+ *
+ * 5. Seasonal and Geographic Variations:
+ *    - Pressure patterns vary significantly by season and location
+ *    - Coastal areas may have different optimal pressure ranges than inland regions
+ *    - Altitude affects baseline pressure readings and interpretation
+ *
+ * Threshold Analysis:
+ * - >1020 hPa: Excellent conditions, clear skies, stable atmosphere
+ * - 1010-1020 hPa: Good conditions, typical fair weather
+ * - 1000-1010 hPa: Fair conditions, some atmospheric instability
+ * - 990-1000 hPa: Poor conditions, likely cloudy/unstable
+ * - <990 hPa: Very poor conditions, stormy weather likely
+ *
+ * Scientific Basis:
+ * The relationship between pressure and sunset quality is supported by meteorological
+ * research showing that high-pressure systems create the most favorable conditions
+ * for clear, vibrant sunsets. This is due to the combination of reduced cloud cover,
+ * stable atmospheric conditions, and typically cleaner air quality.
+ *
+ * Note: Pressure alone is not a perfect predictor, but it provides valuable context
+ * when combined with other meteorological factors like humidity, visibility, and
+ * cloud coverage.
+ */
+function pressureScore(prediction: PredictionData) {
+  // Normalize pressure to sea level if needed (most weather APIs provide this)
+  const pressure = prediction.surface_pressure;
+
+  if (pressure > 1020) {
+    return 1.0; // Excellent conditions - clear skies, stable atmosphere
+  }
+  if (pressure > 1010) {
+    return 0.95; // Good conditions - typical fair weather
+  }
+  if (pressure > 1000) {
+    return 0.85; // Fair conditions - some atmospheric instability
+  }
+  if (pressure > 990) {
+    return 0.7; // Poor conditions - likely cloudy/unstable
+  }
+  return 0.5; // Very poor conditions - stormy weather likely
 }
 
 /**

@@ -206,7 +206,7 @@ export default function SunsetDetails({ prediction }: SunsetDetailsProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="rounded-lg border p-3 text-center">
               <p className="text-sm font-medium text-muted-foreground">
                 Cloud Coverage
@@ -229,6 +229,14 @@ export default function SunsetDetails({ prediction }: SunsetDetailsProps) {
               </p>
               <p className="text-2xl font-bold text-cyan-600">
                 {prediction.scores.humidity}%
+              </p>
+            </div>
+            <div className="rounded-lg border p-3 text-center">
+              <p className="text-sm font-medium text-muted-foreground">
+                Pressure
+              </p>
+              <p className="text-2xl font-bold text-purple-600">
+                {prediction.scores.pressure}%
               </p>
             </div>
             <div className="rounded-lg border p-3 text-center">

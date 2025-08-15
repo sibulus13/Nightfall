@@ -294,7 +294,7 @@ export default function ExpandablePredictionCard({
               </div>
 
               {/* Score Breakdown - Compact */}
-              <div className="grid grid-cols-4 gap-2 text-xs">
+              <div className="grid grid-cols-5 gap-2 text-xs">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="text-center">
@@ -334,6 +334,20 @@ export default function ExpandablePredictionCard({
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Humidity Score</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="text-center">
+                      <div className="text-white/80">Pres</div>
+                      <div className="text-sm font-bold">
+                        {prediction.scores.pressure}%
+                      </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Pressure Score</p>
                   </TooltipContent>
                 </Tooltip>
 

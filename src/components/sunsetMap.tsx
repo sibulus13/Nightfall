@@ -52,8 +52,8 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   zoomLevel = 10,
   minZoom = 3,
   maxZoom = 18,
-  gridRows = 5,
-  gridColumns = 5,
+  gridRows = 3,
+  gridColumns = 3,
   topScorePercentage = 20,
   onLocationChange,
 }) => {

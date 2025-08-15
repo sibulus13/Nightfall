@@ -34,6 +34,7 @@ export type Prediction = {
     cloudCoverage: number;
     visibility: number;
     humidity: number;
+    pressure: number;
   };
   // Detailed weather information
   cloud_cover: number;
