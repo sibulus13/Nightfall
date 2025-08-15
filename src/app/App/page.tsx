@@ -1,26 +1,16 @@
 "use client";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { type Prediction } from "~/lib/sunset/type";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Hourglass } from "lucide-react";
-import { BsSunset } from "react-icons/bs";
 import { TbSunset2 } from "react-icons/tb";
 import { MapPin } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
+import { TooltipProvider } from "~/components/ui/tooltip";
 
-import WeatherDisplay from "~/components/weatherDisplay";
 import Locator from "~/components/locator";
 import SunsetMap from "~/components/sunsetMap";
-import ExpandablePredictionCard from "~/components/expandablePredictionCard";
+import PredictionCard from "~/components/predictionCard";
 import { useSelector } from "react-redux";
 import usePrediction from "~/hooks/usePrediction";
 import { useMapData } from "~/hooks/useMapData";
-import { formatDate, formatTime } from "~/lib/time/helper";
 import { clearRateLimit } from "~/lib/map/mapSlice";
 import { useDispatch } from "react-redux";
 import { areCoordinatesEqual } from "~/lib/utils";
@@ -329,7 +319,7 @@ export default function AppPage() {
                   style={{ alignItems: "center" }}
                 >
                   {prediction.map((entry, i) => (
-                    <ExpandablePredictionCard
+                    <PredictionCard
                       key={i}
                       prediction={entry}
                       onMapClick={() => {

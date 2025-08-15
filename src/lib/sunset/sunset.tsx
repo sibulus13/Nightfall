@@ -6,9 +6,8 @@ import {
 } from "~/lib/sunset/type";
 
 export async function getSunsetPrediction(latitude: number, longitude: number) {
-  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,surface_pressure&daily=sunrise,sunset,daylight_duration,sunshine_duration&timezone=auto`;
-  const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=52.52&longitude=13.41&hourly=pm10,pm2_5&current=us_aqi&timezone=auto&forecast_days=7`;
-
+  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=sunrise,sunset,daylight_duration,sunshine_duration&hourly=temperature_2m,weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,surface_pressure,dew_point_2m,wind_speed_10m,wind_direction_10m,precipitation_probability,uv_index,uv_index_clear_sky,cape&timezone=auto`;
+  const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&hourly=pm10,pm2_5,ozone,nitrogen_dioxide,aerosol_optical_depth&current=us_aqi&timezone=auto&forecast_days=7`;
   // Fetch both weather and air quality data in parallel
   const [weatherRes, airQualityRes] = await Promise.all([
     fetch(weatherUrl),
@@ -74,6 +73,9 @@ export function calculateSunsetPredictions(
     let pm10 = 0;
     let pm2_5 = 0;
     let european_aqi = 0;
+    let ozone = 0;
+    let nitrogen_dioxide = 0;
+    let aerosol_optical_depth = 0;
 
     if (airQualityForecast?.hourly) {
       if (
@@ -106,6 +108,48 @@ export function calculateSunsetPredictions(
           airQualityForecast.hourly.european_aqi[sunset_start_hourly_index] ??
             0,
           airQualityForecast.hourly.european_aqi[sunset_end_hourly_index] ?? 0,
+          interpolateRatio,
+        );
+      }
+
+      if (
+        airQualityForecast.hourly.ozone?.[sunset_start_hourly_index] !==
+        undefined
+      ) {
+        ozone = interpolate(
+          airQualityForecast.hourly.ozone[sunset_start_hourly_index] ?? 0,
+          airQualityForecast.hourly.ozone[sunset_end_hourly_index] ?? 0,
+          interpolateRatio,
+        );
+      }
+
+      if (
+        airQualityForecast.hourly.nitrogen_dioxide?.[
+          sunset_start_hourly_index
+        ] !== undefined
+      ) {
+        nitrogen_dioxide = interpolate(
+          airQualityForecast.hourly.nitrogen_dioxide[
+            sunset_start_hourly_index
+          ] ?? 0,
+          airQualityForecast.hourly.nitrogen_dioxide[sunset_end_hourly_index] ??
+            0,
+          interpolateRatio,
+        );
+      }
+
+      if (
+        airQualityForecast.hourly.aerosol_optical_depth?.[
+          sunset_start_hourly_index
+        ] !== undefined
+      ) {
+        aerosol_optical_depth = interpolate(
+          airQualityForecast.hourly.aerosol_optical_depth[
+            sunset_start_hourly_index
+          ] ?? 0,
+          airQualityForecast.hourly.aerosol_optical_depth[
+            sunset_end_hourly_index
+          ] ?? 0,
           interpolateRatio,
         );
       }
@@ -165,10 +209,64 @@ export function calculateSunsetPredictions(
         interpolateRatio,
         "closest",
       ),
+      // Enhanced weather parameters
+      temperature_2m: interpolate(
+        forecast.hourly.temperature_2m?.[sunset_start_hourly_index] ?? 15,
+        forecast.hourly.temperature_2m?.[sunset_end_hourly_index] ?? 15,
+        interpolateRatio,
+      ),
+      dew_point_2m: interpolate(
+        forecast.hourly.dew_point_2m?.[sunset_start_hourly_index] ?? 10,
+        forecast.hourly.dew_point_2m?.[sunset_end_hourly_index] ?? 10,
+        interpolateRatio,
+      ),
+      wind_speed_10m: interpolate(
+        forecast.hourly.wind_speed_10m?.[sunset_start_hourly_index] ?? 5,
+        forecast.hourly.wind_speed_10m?.[sunset_end_hourly_index] ?? 5,
+        interpolateRatio,
+      ),
+      wind_direction_10m: interpolate(
+        forecast.hourly.wind_direction_10m?.[sunset_start_hourly_index] ?? 180,
+        forecast.hourly.wind_direction_10m?.[sunset_end_hourly_index] ?? 180,
+        interpolateRatio,
+        "closest",
+      ),
+      precipitation_probability: interpolate(
+        forecast.hourly.precipitation_probability?.[
+          sunset_start_hourly_index
+        ] ?? 0,
+        forecast.hourly.precipitation_probability?.[sunset_end_hourly_index] ??
+          0,
+        interpolateRatio,
+      ),
+      cape: interpolate(
+        forecast.hourly.cape?.[sunset_start_hourly_index] ?? 0,
+        forecast.hourly.cape?.[sunset_end_hourly_index] ?? 0,
+        interpolateRatio,
+      ),
+      cin: interpolate(
+        forecast.hourly.cin?.[sunset_start_hourly_index] ?? 0,
+        forecast.hourly.cin?.[sunset_end_hourly_index] ?? 0,
+        interpolateRatio,
+      ),
+      uv_index: interpolate(
+        forecast.hourly.uv_index?.[sunset_start_hourly_index] ?? 0,
+        forecast.hourly.uv_index?.[sunset_end_hourly_index] ?? 0,
+        interpolateRatio,
+      ),
+      uv_index_clear_sky: interpolate(
+        forecast.hourly.uv_index_clear_sky?.[sunset_start_hourly_index] ?? 0,
+        forecast.hourly.uv_index_clear_sky?.[sunset_end_hourly_index] ?? 0,
+        interpolateRatio,
+      ),
       // Air quality data
       pm10,
       pm2_5,
       european_aqi,
+      // Enhanced air quality parameters
+      aerosol_optical_depth,
+      ozone,
+      nitrogen_dioxide,
     };
     const sunsetScore = calculateSunsetScore(prediction);
     const res = {
@@ -185,10 +283,24 @@ export function calculateSunsetPredictions(
       visibility: prediction.visibility,
       humidity: prediction.humidity,
       surface_pressure: prediction.surface_pressure,
+      // Enhanced weather parameters
+      temperature_2m: prediction.temperature_2m,
+      dew_point_2m: prediction.dew_point_2m,
+      wind_speed_10m: prediction.wind_speed_10m,
+      wind_direction_10m: prediction.wind_direction_10m,
+      precipitation_probability: prediction.precipitation_probability,
+      cape: prediction.cape,
+      cin: prediction.cin,
+      uv_index: prediction.uv_index,
+      uv_index_clear_sky: prediction.uv_index_clear_sky,
       // Air quality data
       pm10: prediction.pm10,
       pm2_5: prediction.pm2_5,
       european_aqi: prediction.european_aqi,
+      // Enhanced air quality parameters
+      aerosol_optical_depth: prediction.aerosol_optical_depth,
+      ozone: prediction.ozone,
+      nitrogen_dioxide: prediction.nitrogen_dioxide,
     };
     predictions.push(res);
   }
@@ -245,20 +357,87 @@ function interpolate(start: number, end: number, ratio: number, type?: string) {
  *    - Low pressure (<1010 hPa): Unstable conditions, likely cloudy/stormy
  *    - Very low pressure (<990 hPa): Poor conditions, stormy weather likely
  *
+ * 5. Particulate Matter: Complex relationship with sunset quality
+ *    - Moderate pollution can enhance colors through light scattering
+ *    - High pollution reduces visibility and overall quality
+ *    - Very low pollution may lack dramatic scattering effects
+ *
+ * TODO: Additional factors to consider for enhanced scoring:
+ * - Wind speed and direction (affects cloud movement and atmospheric stability)
+ * - Temperature and temperature gradient (affects atmospheric density and light refraction)
+ * - Ozone levels (affects UV scattering and color perception)
+ * - Aerosol optical depth (more precise than PM2.5/PM10 for light scattering)
+ * - Solar elevation angle (affects light path length through atmosphere)
+ * - Geographic location factors (altitude, latitude, proximity to water bodies)
+ * - Seasonal adjustments (different optimal ranges for different seasons)
+ * - Time of year (affects sun angle and atmospheric conditions)
+ * - Weather system type (high pressure vs low pressure systems)
+ * - Cloud type classification (cirrus vs cumulus vs stratus)
+ * - Atmospheric moisture content (dew point vs relative humidity)
+ * - Air mass characteristics (maritime vs continental)
+ * - Urban heat island effects (affects local atmospheric conditions)
+ * - Wildfire smoke presence and type
+ * - Industrial pollution patterns
+ * - Volcanic aerosol effects
+ * - Saharan dust events
+ * - Marine layer effects (coastal areas)
+ * - Mountain wave effects (orographic lifting)
+ *
+ * TODO: Scoring methodology improvements:
+ * - Implement weighted scoring instead of pure multiplicative
+ * - Add seasonal and geographic calibration factors
+ * - Include confidence intervals for predictions
+ * - Add machine learning model for pattern recognition
+ * - Implement ensemble methods combining multiple scoring approaches
+ * - Add real-time feedback loop from user ratings
+ * - Include historical accuracy tracking
+ * - Add uncertainty quantification for predictions
+ * - Implement adaptive thresholds based on location
+ * - Add time-of-day specific adjustments
+ *
  * The scoring uses a multiplicative approach where each factor can reduce the overall score.
  * This reflects the reality that any single factor can significantly impact sunset quality.
  * Pressure is particularly important as it correlates strongly with overall weather patterns
  * and atmospheric stability that affect all other factors.
  */
 function calculateSunsetScore(prediction: PredictionData) {
-  let score = 1;
+  // Get individual scores
   const cCScore = cloudCoverageScore(prediction);
   const vsScore = visibilityScore(prediction);
   const hScore = humidityScore(prediction);
   const pScore = pressureScore(prediction);
   const partScore = particulateScore(prediction);
+  const wScore = windScore(prediction);
+  const tScore = temperatureScore(prediction);
+  const sScore = stabilityScore(prediction);
+  const uScore = uvScore(prediction);
+  const aodScore = aerosolOpticalDepthScore(prediction);
+  const aqiScore = europeanAQIScore(prediction);
+  const o3Score = ozoneScore(prediction);
+  const no2Score = nitrogenDioxideScore(prediction);
 
-  score = cCScore * vsScore * hScore * pScore * partScore;
+  const scores_to_use = [
+    cCScore,
+    vsScore,
+    hScore,
+    pScore,
+    partScore,
+    wScore,
+    tScore,
+  ];
+  // Use multiplicative scoring for more realistic range
+  // This creates better differentiation between good and poor conditions
+  let score = scores_to_use.reduce((acc, curr) => acc * curr, 1);
+
+  // Apply bonus for excellent conditions (multiple high scores)
+  const excellentFactors = scores_to_use.filter((score) => score >= 0.9).length;
+
+  for (let i = 0; i < excellentFactors; i++) {
+    score *= 1.1;
+  } // to balance out low scores, we multiply the score by 1.1 for each excellent factor
+
+  // Ensure score stays within reasonable bounds
+  score = Math.max(0.05, Math.min(1.01, score));
 
   return {
     score: Math.round(score * 100),
@@ -267,6 +446,14 @@ function calculateSunsetScore(prediction: PredictionData) {
     humidity: Math.round(hScore * 100),
     pressure: Math.round(pScore * 100),
     particulate: Math.round(partScore * 100),
+    wind: Math.round(wScore * 100),
+    temperature: Math.round(tScore * 100),
+    stability: Math.round(sScore * 100),
+    uv: Math.round(uScore * 100),
+    aerosolOpticalDepth: Math.round(aodScore * 100),
+    europeanAQI: Math.round(aqiScore * 100),
+    ozone: Math.round(o3Score * 100),
+    nitrogenDioxide: Math.round(no2Score * 100),
   };
 }
 
@@ -304,12 +491,50 @@ function calculateSunsetScore(prediction: PredictionData) {
  *    - Coastal areas may have different optimal pressure ranges than inland regions
  *    - Altitude affects baseline pressure readings and interpretation
  *
+ * TODO: Pressure scoring improvements:
+ * - Add pressure trend analysis (rising vs falling)
+ * - Include pressure gradient calculations
+ * - Add pressure altitude corrections
+ * - Implement pressure seasonal adjustments
+ * - Add pressure geographic variations
+ * - Include pressure system type classification
+ * - Add pressure front effects
+ * - Implement pressure trough effects
+ * - Add pressure ridge effects
+ * - Include pressure cyclone effects
+ * - Add pressure anticyclone effects
+ * - Implement pressure convergence effects
+ * - Add pressure divergence effects
+ * - Include pressure advection effects
+ * - Add pressure vertical structure analysis
+ * - Implement pressure temporal patterns
+ * - Add pressure spatial patterns
+ * - Include pressure weather system correlations
+ * - Add pressure wind interactions
+ * - Implement pressure temperature interactions
+ * - Add pressure humidity interactions
+ * - Include pressure cloud interactions
+ * - Add pressure visibility interactions
+ * - Implement pressure aerosol interactions
+ * - Add pressure urban effects
+ * - Include pressure topographic effects
+ * - Add pressure maritime effects
+ * - Implement pressure continental effects
+ *
  * Threshold Analysis:
  * - >1020 hPa: Excellent conditions, clear skies, stable atmosphere
  * - 1010-1020 hPa: Good conditions, typical fair weather
  * - 1000-1010 hPa: Fair conditions, some atmospheric instability
  * - 990-1000 hPa: Poor conditions, likely cloudy/unstable
  * - <990 hPa: Very poor conditions, stormy weather likely
+ *
+ * Current limitations:
+ * - No consideration of pressure trends or gradients
+ * - No altitude corrections for different locations
+ * - No seasonal or geographic adjustments
+ * - No integration with weather system types
+ * - Simplified threshold approach may not capture complex interactions
+ * - No consideration of pressure quality or uniformity
  *
  * Scientific Basis:
  * The relationship between pressure and sunset quality is supported by meteorological
@@ -332,12 +557,15 @@ function pressureScore(prediction: PredictionData) {
     return 0.95; // Good conditions - typical fair weather
   }
   if (pressure > 1000) {
-    return 0.85; // Fair conditions - some atmospheric instability
+    return 0.9; // Fair conditions - some atmospheric instability
   }
   if (pressure > 990) {
-    return 0.7; // Poor conditions - likely cloudy/unstable
+    return 0.8; // Poor conditions - likely cloudy/unstable
   }
-  return 0.5; // Very poor conditions - stormy weather likely
+  if (pressure > 980) {
+    return 0.65; // Very poor conditions - stormy weather likely
+  }
+  return 0.5; // Extremely poor conditions - severe weather
 }
 
 /**
@@ -372,12 +600,53 @@ function pressureScore(prediction: PredictionData) {
  *    - The scoring balances aesthetic appeal with air quality concerns
  *    - Very high pollution levels are penalized despite potential color enhancement
  *
+ * TODO: Particulate scoring improvements:
+ * - Add aerosol optical depth measurements (more precise than PM2.5/PM10)
+ * - Include particle size distribution analysis
+ * - Add particle composition analysis (organic vs inorganic)
+ * - Implement particle source identification (traffic, industry, natural)
+ * - Add particle temporal patterns (diurnal, seasonal)
+ * - Include particle spatial distribution analysis
+ * - Add particle vertical profile analysis
+ * - Implement particle aging effects
+ * - Add particle hygroscopic growth effects
+ * - Include particle coagulation effects
+ * - Add particle deposition effects
+ * - Implement particle transport effects
+ * - Add particle transformation effects
+ * - Include particle chemical composition effects
+ * - Add particle optical properties analysis
+ * - Implement particle radiative effects
+ * - Add particle cloud interactions
+ * - Include particle precipitation effects
+ * - Add particle wind effects
+ * - Implement particle temperature effects
+ * - Add particle humidity effects
+ * - Include particle pressure effects
+ * - Add particle visibility interactions
+ * - Implement particle color effects
+ * - Add particle health impact considerations
+ * - Include particle environmental impact considerations
+ * - Add particle regulatory compliance considerations
+ * - Implement particle forecasting capabilities
+ * - Add particle historical trend analysis
+ * - Include particle climate change effects
+ *
  * Threshold Analysis:
  * - PM2.5 <5 μg/m³: Very clean air, may lack dramatic colors
  * - PM2.5 5-15 μg/m³: Good conditions, some enhancement without health risks
  * - PM2.5 15-35 μg/m³: Moderate pollution, optimal sunset enhancement
  * - PM2.5 35-55 μg/m³: High pollution, reduced visibility despite color enhancement
  * - PM2.5 >55 μg/m³: Very high pollution, poor conditions and health risks
+ *
+ * Current limitations:
+ * - Uses PM2.5/PM10 instead of more precise aerosol optical depth
+ * - No consideration of particle composition or source
+ * - No integration with particle size distribution
+ * - Simplified threshold approach may not capture complex interactions
+ * - No seasonal or geographic adjustments
+ * - No consideration of particle quality or uniformity
+ * - No integration with other atmospheric factors
  *
  * Scientific Basis:
  * The relationship between particulate matter and sunset quality is supported by
@@ -393,6 +662,9 @@ function particulateScore(prediction: PredictionData) {
   const pm10 = prediction.pm10;
 
   // Primary scoring based on PM2.5 levels
+  if (pm2_5 > 70) {
+    return 0.25; // Extremely high pollution - very poor conditions
+  }
   if (pm2_5 > 55) {
     return 0.4; // Very high pollution - poor conditions and health risks
   }
@@ -400,12 +672,12 @@ function particulateScore(prediction: PredictionData) {
     return 0.6; // High pollution - reduced visibility despite potential color enhancement
   }
   if (pm2_5 > 15) {
-    return 0.9; // Moderate pollution - optimal sunset enhancement
+    return 1; // Moderate pollution - optimal sunset enhancement
   }
   if (pm2_5 > 5) {
-    return 0.95; // Good conditions - some enhancement without health risks
+    return 0.85; // Good conditions - some enhancement without health risks
   }
-  return 0.85; // Very clean air - may lack dramatic colors but excellent visibility
+  return 0.75; // Very clean air - may lack dramatic colors but excellent visibility
 }
 
 /**
@@ -426,26 +698,60 @@ function particulateScore(prediction: PredictionData) {
  * 4. Color Saturation: Lower humidity typically results in more vibrant, saturated
  *    colors because there's less atmospheric interference with the light path.
  *
+ * TODO: Humidity scoring improvements:
+ * - Add dew point temperature considerations (more accurate than relative humidity)
+ * - Include absolute humidity measurements (g/m³)
+ * - Add humidity gradient analysis (surface vs elevated)
+ * - Implement humidity temporal patterns (morning vs evening)
+ * - Add humidity geographic variations (coastal vs inland)
+ * - Include humidity seasonal adjustments
+ * - Add humidity temperature interactions
+ * - Implement humidity pressure interactions
+ * - Add humidity wind effects
+ * - Include humidity cloud interactions
+ * - Add humidity aerosol interactions
+ * - Implement humidity condensation effects
+ * - Add humidity evaporation effects
+ * - Include humidity precipitation effects
+ * - Add humidity fog formation effects
+ * - Implement humidity haze formation effects
+ * - Add humidity mirage effects
+ * - Include humidity refraction effects
+ * - Add humidity absorption effects
+ * - Implement humidity emission effects
+ * - Add humidity urban heat island effects
+ * - Include humidity agricultural effects
+ * - Add humidity water body effects
+ * - Implement humidity vegetation effects
+ *
  * Thresholds are based on typical atmospheric conditions:
  * - <40%: Excellent conditions, minimal scattering
  * - 40-60%: Good conditions, slight scattering
  * - 60-80%: Fair conditions, moderate scattering
  * - >80%: Poor conditions, heavy scattering
  *
- * Note: These thresholds may need adjustment based on geographic location and
- * seasonal variations. Desert regions might have different optimal ranges.
+ * Current limitations:
+ * - Uses relative humidity instead of more accurate dew point
+ * - No consideration of humidity gradients or patterns
+ * - Simplified threshold approach may not capture complex interactions
+ * - No seasonal or geographic adjustments
+ * - No consideration of humidity quality or uniformity
+ * - No integration with temperature or pressure effects
  */
 function humidityScore(prediction: PredictionData) {
-  if (prediction.humidity > 80) {
-    return 0.7; // Heavy scattering, muted colors
+  if (prediction.humidity > 85) {
+    return 0.5; // Very heavy scattering
   }
-  if (prediction.humidity > 60) {
+  if (prediction.humidity > 70) {
+    return 0.65; // Heavy scattering, muted colors
+  }
+  if (prediction.humidity > 50) {
     return 0.8; // Moderate scattering
   }
-  if (prediction.humidity > 40) {
+  if (prediction.humidity > 30) {
     return 0.9; // Light scattering
   }
-  return 1; // Minimal scattering, optimal conditions
+  return 1.0; // Minimal scattering, optimal conditions
 }
 
 /**
@@ -467,6 +773,30 @@ function humidityScore(prediction: PredictionData) {
  *    scattering effects are amplified. This is why sunsets are more colorful than
  *    midday sun.
  *
+ * TODO: Visibility scoring improvements:
+ * - Integrate with PM2.5/PM10 data for better pollution paradox modeling
+ * - Add aerosol optical depth measurements (more precise than visibility)
+ * - Include atmospheric extinction coefficient calculations
+ * - Add visibility trend analysis (improving vs deteriorating)
+ * - Implement visibility quality assessment (uniform vs patchy)
+ * - Add visibility depth analysis (surface vs elevated)
+ * - Include visibility color analysis (white vs colored haze)
+ * - Add visibility temporal patterns (morning vs evening)
+ * - Implement visibility geographic variations (urban vs rural)
+ * - Add visibility seasonal adjustments
+ * - Include visibility weather system correlations
+ * - Add visibility altitude effects
+ * - Implement visibility humidity interactions
+ * - Add visibility temperature effects
+ * - Include visibility wind effects
+ * - Add visibility precipitation effects
+ * - Implement visibility fog/mist specific handling
+ * - Add visibility dust/sand storm effects
+ * - Include visibility wildfire smoke effects
+ * - Add visibility industrial pollution patterns
+ * - Implement visibility marine layer effects
+ * - Add visibility mountain wave effects
+ *
  * Threshold Analysis:
  * - <10km: Poor visibility, likely heavy pollution or weather conditions
  *   that block too much light despite potential color enhancement
@@ -474,17 +804,24 @@ function humidityScore(prediction: PredictionData) {
  *   while still allowing sufficient light transmission
  * - >20km: Excellent visibility, clear conditions optimal for vibrant sunsets
  *
- * Future improvements could incorporate actual air quality data (PM2.5, PM10)
- * to better model the pollution paradox effect.
+ * Current limitations:
+ * - Does not distinguish between different types of visibility reduction
+ * - No integration with actual air quality measurements
+ * - Simplified threshold approach may not capture complex interactions
+ * - No consideration of visibility quality or uniformity
+ * - No seasonal or geographic adjustments
  */
 function visibilityScore(prediction: PredictionData) {
+  if (prediction.visibility < 5000) {
+    return 0.6; // Very poor visibility
+  }
   if (prediction.visibility < 10000) {
-    return 0.7; // Poor visibility, too much light blocking
+    return 0.75; // Poor visibility, but some enhancement possible
   }
   if (prediction.visibility < 20000) {
     return 0.9; // Moderate visibility, some pollution enhancement
   }
-  return 1; // Excellent visibility, optimal conditions
+  return 1.0; // Excellent visibility, optimal conditions
 }
 
 /**
@@ -516,15 +853,39 @@ function visibilityScore(prediction: PredictionData) {
  *    - Too much (>90%): Blocks too much light
  *    - Sweet spot: 30-50% for optimal balance
  *
+ * TODO: Cloud scoring improvements:
+ * - Implement separate weighted scoring for mid vs high clouds
+ * - Add cloud type classification (cirrus vs cumulus vs stratus)
+ * - Include cloud base height in scoring calculations
+ * - Add cloud thickness/density considerations
+ * - Implement cloud movement patterns (stationary vs moving)
+ * - Add cloud edge effects (sharp vs diffuse boundaries)
+ * - Include cloud color analysis (white vs gray vs colored)
+ * - Add cloud formation patterns (organized vs scattered)
+ * - Implement seasonal cloud pattern adjustments
+ * - Add geographic cloud pattern variations
+ * - Include cloud optical depth measurements
+ * - Add cloud particle size distribution effects
+ * - Implement cloud phase effects (ice vs water droplets)
+ * - Add cloud shadow effects on ground conditions
+ * - Include cloud reflection effects on water bodies
+ * - Add cloud-induced wind effects
+ * - Implement cloud temperature gradient effects
+ * - Add cloud moisture content considerations
+ * - Include cloud aerosol interactions
+ * - Add cloud radiative effects
+ *
  * The scoring algorithm prioritizes:
  * - Low cloud coverage (inverse relationship)
  * - Moderate total coverage (bell curve around 40%)
  * - Mid/high clouds are currently weighted less but could be enhanced
  *
- * Future improvements could include:
- * - Separate scoring for mid vs high clouds
- * - Cloud type classification (cirrus vs cumulus)
- * - Time-of-day specific adjustments
+ * Current limitations:
+ * - Does not distinguish between cloud types
+ * - No consideration of cloud movement or patterns
+ * - Simplified bell curve approach may not capture complex interactions
+ * - No seasonal or geographic adjustments
+ * - No consideration of cloud optical properties
  */
 function cloudCoverageScore(prediction: PredictionData) {
   let score = 1;
@@ -532,21 +893,401 @@ function cloudCoverageScore(prediction: PredictionData) {
   // Calculate overall cloud cover score using a bell curve around 40%
   // This reflects that some clouds are good, but too many block too much light
   if (prediction.cloud_cover > 90 || prediction.cloud_cover < 10) {
-    score *= 0.5; // Too much or too little coverage
+    score *= 0.4; // More realistic penalty - too much or too little coverage
   } else {
     // Bell curve: optimal at 40%, decreasing as we move away
-    score *= 1 - Math.abs(prediction.cloud_cover - 40) / 100;
+    const deviation = Math.abs(prediction.cloud_cover - 40);
+    score *= Math.max(0.5, 1 - deviation / 80); // More realistic penalty, optimal gets 1.0
   }
 
   // Calculate low cloud cover score (inverse relationship)
   // Low clouds are generally bad for sunsets as they block direct light
   if (prediction.cloud_cover_low > 40) {
-    // Heavy penalty for high low cloud coverage
-    score *= 1 - prediction.cloud_cover_low / 100 + 0.5;
+    // More realistic penalty for high low cloud coverage
+    score *= Math.max(0.3, 1 - prediction.cloud_cover_low / 100 + 0.3);
   } else {
-    // Slight penalty for deviation from ideal low coverage (15%)
-    score *= 1 - Math.abs(prediction.cloud_cover_low - 15) / 100;
+    // More realistic scoring for deviation from ideal low coverage (15%)
+    const deviation = Math.abs(prediction.cloud_cover_low - 15);
+    score *= Math.max(0.7, 1 - deviation / 100);
   }
 
   return score;
+}
+
+/**
+ * Calculate wind impact on sunset quality
+ *
+ * Wind affects sunset quality through several mechanisms:
+ *
+ * 1. Cloud Movement: Wind can move clouds into or out of the sunset viewing area
+ *    - Light winds (5-15 km/h): Ideal for stable cloud formations
+ *    - Moderate winds (15-25 km/h): Can create dynamic cloud patterns
+ *    - High winds (>25 km/h): Can clear clouds or create turbulent conditions
+ *
+ * 2. Atmospheric Stability: Wind patterns indicate atmospheric stability
+ *    - Calm conditions: Often associated with stable, clear conditions
+ *    - Light breezes: Optimal for sunset viewing
+ *    - Strong winds: Can indicate approaching weather systems
+ *
+ * 3. Aerosol Transport: Wind can transport or disperse atmospheric particles
+ *    - Offshore winds: Often bring cleaner air from over water
+ *    - Onshore winds: Can bring marine aerosols that enhance colors
+ *    - Cross-winds: Can transport pollution or dust
+ *
+ * 4. Temperature Mixing: Wind affects temperature gradients and atmospheric mixing
+ *    - Light winds: Allow temperature stratification that can enhance colors
+ *    - Strong winds: Mix atmospheric layers, potentially reducing color intensity
+ *
+ * Threshold Analysis:
+ * - <5 km/h: Calm conditions, optimal for stable viewing
+ * - 5-15 km/h: Light breeze, ideal for sunset viewing
+ * - 15-25 km/h: Moderate wind, good conditions with some cloud movement
+ * - 25-35 km/h: Strong wind, may affect cloud patterns
+ * - >35 km/h: Very strong wind, likely poor conditions
+ */
+function windScore(prediction: PredictionData) {
+  const windSpeed = prediction.wind_speed_10m;
+
+  if (windSpeed < 5) {
+    return 1.0; // Calm conditions, optimal
+  }
+  if (windSpeed < 15) {
+    return 0.95; // Light breeze, ideal
+  }
+  if (windSpeed < 25) {
+    return 0.9; // Moderate wind, good
+  }
+  if (windSpeed < 35) {
+    return 0.8; // Strong wind, fair
+  }
+  return 0.6; // Very strong wind, poor
+}
+
+/**
+ * Calculate temperature impact on sunset quality
+ *
+ * Temperature affects sunset quality through several mechanisms:
+ *
+ * 1. Atmospheric Density: Temperature affects air density and light refraction
+ *    - Cooler temperatures: Higher air density, more light scattering
+ *    - Warmer temperatures: Lower air density, less scattering
+ *    - Temperature gradients: Can create mirage effects and enhanced colors
+ *
+ * 2. Moisture Capacity: Temperature affects atmospheric moisture content
+ *    - Cooler air: Can hold less moisture, potentially clearer conditions
+ *    - Warmer air: Can hold more moisture, potentially hazier conditions
+ *    - Dew point relationship: Critical for understanding actual moisture content
+ *
+ * 3. Thermal Stability: Temperature affects atmospheric stability
+ *    - Cool conditions: Often more stable, clearer skies
+ *    - Warm conditions: Can create thermal turbulence
+ *    - Temperature inversions: Can trap pollutants and create dramatic effects
+ *
+ * 4. Seasonal Effects: Temperature patterns vary by season
+ *    - Spring/Fall: Often optimal temperature ranges
+ *    - Summer: Can be too warm, creating haze
+ *    - Winter: Can be too cold, affecting light transmission
+ *
+ * Threshold Analysis:
+ * - <0°C: Very cold, may affect light transmission
+ * - 0-10°C: Cool, often clear conditions
+ * - 10-20°C: Optimal temperature range
+ * - 20-30°C: Warm, good conditions
+ * - >30°C: Hot, may create haze
+ */
+function temperatureScore(prediction: PredictionData) {
+  const temperature = prediction.temperature_2m;
+
+  if (temperature < 0) {
+    return 0.8; // Very cold, may affect transmission
+  }
+  if (temperature < 10) {
+    return 0.95; // Cool, often clear
+  }
+  if (temperature < 20) {
+    return 1.0; // Optimal range
+  }
+  if (temperature < 30) {
+    return 0.9; // Warm, good
+  }
+  return 0.7; // Hot, may create haze
+}
+
+/**
+ * Calculate atmospheric stability impact on sunset quality
+ *
+ * Atmospheric stability is crucial for sunset quality and can be assessed through:
+ *
+ * 1. CAPE (Convective Available Potential Energy): Measures atmospheric instability
+ *    - Low CAPE (<500 J/kg): Stable conditions, good for sunsets
+ *    - Moderate CAPE (500-1000 J/kg): Some instability, can enhance colors
+ *    - High CAPE (>1000 J/kg): Unstable, likely stormy conditions
+ *
+ * 2. CIN (Convective Inhibition): Measures atmospheric stability
+ *    - High CIN (>200 J/kg): Very stable, often clear conditions
+ *    - Moderate CIN (50-200 J/kg): Stable, good conditions
+ *    - Low CIN (<50 J/kg): Less stable, variable conditions
+ *
+ * 3. Pressure Patterns: High pressure systems are typically more stable
+ *    - High pressure: Stable, clear conditions
+ *    - Low pressure: Unstable, cloudy conditions
+ *
+ * 4. Wind Patterns: Calm or light winds indicate stability
+ *    - Calm winds: Stable conditions
+ *    - Strong winds: Can indicate instability
+ *
+ * Threshold Analysis:
+ * - CAPE <500 J/kg: Stable conditions, optimal
+ * - CAPE 500-1000 J/kg: Some instability, good
+ * - CAPE >1000 J/kg: Unstable, poor
+ * - CIN >200 J/kg: Very stable, excellent
+ * - CIN 50-200 J/kg: Stable, good
+ * - CIN <50 J/kg: Less stable, variable
+ */
+function stabilityScore(prediction: PredictionData) {
+  const cape = prediction.cape;
+  const cin = prediction.cin;
+
+  let score = 1;
+
+  // CAPE scoring (lower is better for stability)
+  if (cape > 1000) {
+    score *= 0.6; // Very unstable
+  } else if (cape > 500) {
+    score *= 0.8; // Some instability
+  } else {
+    score *= 1.0; // Stable
+  }
+
+  // CIN scoring (higher is better for stability)
+  if (cin > 200) {
+    score *= 1.0; // Very stable
+  } else if (cin > 50) {
+    score *= 0.9; // Stable
+  } else {
+    score *= 0.7; // Less stable
+  }
+
+  return score;
+}
+
+/**
+ * Calculate UV index impact on sunset quality
+ *
+ * UV index affects sunset quality through several mechanisms:
+ *
+ * 1. Light Scattering: UV radiation affects atmospheric scattering patterns
+ *    - High UV: More energetic scattering, can enhance colors
+ *    - Low UV: Less scattering, potentially more muted colors
+ *    - UV vs visible light: Different scattering characteristics
+ *
+ * 2. Ozone Effects: UV levels correlate with ozone concentrations
+ *    - High ozone: Can enhance blue sky colors
+ *    - Low ozone: May reduce atmospheric color effects
+ *    - Ozone layer thickness: Affects overall light transmission
+ *
+ * 3. Atmospheric Composition: UV levels indicate atmospheric clarity
+ *    - Clear conditions: Higher UV transmission
+ *    - Hazy conditions: Lower UV transmission
+ *    - Pollution effects: Can block UV radiation
+ *
+ * 4. Seasonal Patterns: UV levels vary by season and latitude
+ *    - Summer: Higher UV, potentially more dramatic colors
+ *    - Winter: Lower UV, potentially more subtle colors
+ *    - Equatorial regions: Higher UV year-round
+ *
+ * Threshold Analysis:
+ * - UV <2: Low UV, subtle effects
+ * - UV 2-5: Moderate UV, good conditions
+ * - UV 5-8: High UV, enhanced effects
+ * - UV >8: Very high UV, dramatic effects
+ */
+function uvScore(prediction: PredictionData) {
+  const uvIndex = prediction.uv_index;
+
+  if (uvIndex < 2) {
+    return 0.8; // Low UV, subtle effects
+  }
+  if (uvIndex < 5) {
+    return 0.9; // Moderate UV, good
+  }
+  if (uvIndex < 8) {
+    return 1.0; // High UV, enhanced
+  }
+  return 0.95; // Very high UV, dramatic
+}
+
+/**
+ * Calculate aerosol optical depth impact on sunset quality
+ *
+ * Aerosol Optical Depth (AOD) is a more precise measure of light extinction
+ * by atmospheric aerosols than PM2.5/PM10. It directly measures how much
+ * light is scattered or absorbed by particles in the atmosphere.
+ *
+ * 1. Light Scattering Effects:
+ *    - Low AOD (<0.1): Clear conditions, minimal scattering
+ *    - Moderate AOD (0.1-0.3): Optimal for dramatic sunsets
+ *    - High AOD (0.3-0.5): Enhanced colors but reduced visibility
+ *    - Very high AOD (>0.5): Poor conditions, too much light blocking
+ *
+ * 2. Wavelength Dependence:
+ *    - AOD at 400nm: More sensitive to fine particles
+ *    - AOD at 1020nm: More sensitive to larger particles
+ *    - Sunset colors are most affected by shorter wavelengths
+ *
+ * Threshold Analysis:
+ * - AOD <0.1: Very clear, may lack dramatic colors
+ * - AOD 0.1-0.3: Optimal sunset enhancement
+ * - AOD 0.3-0.5: Good enhancement, some visibility reduction
+ * - AOD >0.5: Poor conditions, too much light blocking
+ */
+function aerosolOpticalDepthScore(prediction: PredictionData) {
+  const aod = prediction.aerosol_optical_depth;
+
+  if (aod > 0.8) {
+    return 0.3; // Very high AOD, poor conditions
+  }
+  if (aod > 0.5) {
+    return 0.5; // High AOD, reduced visibility
+  }
+  if (aod > 0.3) {
+    return 0.7; // Moderate AOD, good enhancement
+  }
+  if (aod > 0.1) {
+    return 0.9; // Optimal AOD for sunset enhancement
+  }
+  return 0.8; // Low AOD, clear but may lack dramatic colors
+}
+
+/**
+ * Calculate European Air Quality Index impact on sunset quality
+ *
+ * The European AQI provides a comprehensive measure of air quality
+ * that considers multiple pollutants. It affects sunset quality through:
+ *
+ * 1. Overall Air Quality:
+ *    - Low AQI (0-20): Excellent air quality, clear conditions
+ *    - Moderate AQI (20-40): Good conditions, some enhancement
+ *    - High AQI (40-60): Moderate pollution, optimal enhancement
+ *    - Very high AQI (60-80): High pollution, reduced visibility
+ *    - Extreme AQI (>80): Poor conditions, health risks
+ *
+ * 2. Multi-Pollutant Consideration:
+ *    - Combines PM2.5, PM10, NO2, O3, SO2
+ *    - Provides more comprehensive assessment than individual pollutants
+ *    - Better correlation with actual air quality perception
+ *
+ * Threshold Analysis:
+ * - AQI 0-20: Excellent air quality, may lack dramatic colors
+ * - AQI 20-40: Good conditions, some enhancement
+ * - AQI 40-60: Optimal pollution levels for sunset enhancement
+ * - AQI 60-80: High pollution, reduced visibility
+ * - AQI >80: Poor conditions, health risks
+ */
+function europeanAQIScore(prediction: PredictionData) {
+  const aqi = prediction.european_aqi;
+
+  if (aqi > 80) {
+    return 0.3; // Extreme AQI, poor conditions
+  }
+  if (aqi > 60) {
+    return 0.5; // Very high AQI, reduced visibility
+  }
+  if (aqi > 40) {
+    return 0.8; // High AQI, good enhancement
+  }
+  if (aqi > 20) {
+    return 0.9; // Moderate AQI, optimal enhancement
+  }
+  return 0.8; // Low AQI, excellent air quality
+}
+
+/**
+ * Calculate ozone impact on sunset quality
+ *
+ * Ozone affects sunset quality through several mechanisms:
+ *
+ * 1. Light Scattering:
+ *    - Ozone molecules scatter blue light more than red
+ *    - This can enhance red/orange sunset colors
+ *    - High ozone levels can create more dramatic effects
+ *
+ * 2. Atmospheric Composition:
+ *    - Ozone is a key component of photochemical smog
+ *    - Correlates with other air quality indicators
+ *    - Indicates atmospheric stability and composition
+ *
+ * 3. Health vs. Aesthetic Balance:
+ *    - High ozone can enhance sunset colors
+ *    - But it's harmful to health and indicates poor air quality
+ *    - Scoring balances aesthetic appeal with air quality concerns
+ *
+ * Threshold Analysis:
+ * - O3 <30 μg/m³: Low ozone, may lack dramatic colors
+ * - O3 30-60 μg/m³: Moderate ozone, good enhancement
+ * - O3 60-100 μg/m³: High ozone, optimal enhancement
+ * - O3 100-150 μg/m³: Very high ozone, reduced visibility
+ * - O3 >150 μg/m³: Extreme ozone, poor conditions
+ */
+function ozoneScore(prediction: PredictionData) {
+  const ozone = prediction.ozone;
+
+  if (ozone > 150) {
+    return 0.4; // Extreme ozone, poor conditions
+  }
+  if (ozone > 100) {
+    return 0.6; // Very high ozone, reduced visibility
+  }
+  if (ozone > 60) {
+    return 0.9; // High ozone, optimal enhancement
+  }
+  if (ozone > 30) {
+    return 0.8; // Moderate ozone, good enhancement
+  }
+  return 0.7; // Low ozone, may lack dramatic colors
+}
+
+/**
+ * Calculate nitrogen dioxide impact on sunset quality
+ *
+ * Nitrogen dioxide (NO2) affects sunset quality through:
+ *
+ * 1. Light Absorption:
+ *    - NO2 absorbs blue light, enhancing red/orange colors
+ *    - Creates characteristic urban sunset colors
+ *    - High levels can create dramatic but unhealthy conditions
+ *
+ * 2. Urban Pollution Indicator:
+ *    - Primary source is vehicle emissions
+ *    - Correlates with overall urban air quality
+ *    - Indicates traffic-related pollution patterns
+ *
+ * 3. Health Considerations:
+ *    - NO2 is harmful to respiratory health
+ *    - High levels indicate poor air quality
+ *    - Scoring balances aesthetic appeal with health concerns
+ *
+ * Threshold Analysis:
+ * - NO2 <20 μg/m³: Low NO2, may lack dramatic colors
+ * - NO2 20-40 μg/m³: Moderate NO2, good enhancement
+ * - NO2 40-80 μg/m³: High NO2, optimal enhancement
+ * - NO2 80-120 μg/m³: Very high NO2, reduced visibility
+ * - NO2 >120 μg/m³: Extreme NO2, poor conditions
+ */
+function nitrogenDioxideScore(prediction: PredictionData) {
+  const no2 = prediction.nitrogen_dioxide;
+
+  if (no2 > 120) {
+    return 0.4; // Extreme NO2, poor conditions
+  }
+  if (no2 > 80) {
+    return 0.6; // Very high NO2, reduced visibility
+  }
+  if (no2 > 40) {
+    return 0.9; // High NO2, optimal enhancement
+  }
+  if (no2 > 20) {
+    return 0.8; // Moderate NO2, good enhancement
+  }
+  return 0.7; // Low NO2, may lack dramatic colors
 }

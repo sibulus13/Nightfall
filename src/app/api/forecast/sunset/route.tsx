@@ -10,8 +10,8 @@ export async function GET(request: NextRequest) {
   const latitude = searchParams.get("lat");
   const longitude = searchParams.get("lon");
 
-  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,surface_pressure&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
-  const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&hourly=pm10,pm2_5&current=us_aqi&timezone=auto&forecast_days=7`;
+  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,surface_pressure,temperature_2m,dew_point_2m,wind_speed_10m,wind_direction_10m,precipitation_probability,cape,cin,uv_index,uv_index_clear_sky&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
+  const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&hourly=pm10,pm2_5,ozone,nitrogen_dioxide,aerosol_optical_depth_400nm,aerosol_optical_depth_1020nm&current=us_aqi&timezone=auto&forecast_days=7`;
 
   try {
     // Fetch both weather and air quality data in parallel
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       ...weatherForecast,
       airQuality: airQualityForecast,
     };
-
+    
     return Response.json(combinedData);
   } catch (error) {
     console.error("Error fetching forecast:", error);
