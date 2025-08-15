@@ -21,6 +21,27 @@ export type WeatherForecast = {
   };
 };
 
+export type AirQualityForecast = {
+  hourly: {
+    time: string[];
+    pm10: number[];
+    pm2_5: number[];
+    carbon_monoxide: number[];
+    nitrogen_dioxide: number[];
+    sulphur_dioxide: number[];
+    ozone: number[];
+    dust: number[];
+    uv_index: number[];
+    uv_index_clear_sky: number[];
+    european_aqi: number[];
+    european_aqi_pm2_5: number[];
+    european_aqi_pm10: number[];
+    european_aqi_nitrogen_dioxide: number[];
+    european_aqi_ozone: number[];
+    european_aqi_sulphur_dioxide: number[];
+  };
+};
+
 export type Prediction = {
   score: number;
   golden_hour: {
@@ -35,6 +56,7 @@ export type Prediction = {
     visibility: number;
     humidity: number;
     pressure: number;
+    particulate: number;
   };
   // Detailed weather information
   cloud_cover: number;
@@ -44,6 +66,10 @@ export type Prediction = {
   visibility: number;
   humidity: number;
   surface_pressure: number;
+  // Air quality data
+  pm10: number;
+  pm2_5: number;
+  european_aqi: number;
 };
 
 export type PredictionData = {
@@ -67,4 +93,8 @@ export type PredictionData = {
   humidity: number;
   surface_pressure: number;
   weather_code: number;
+  // Air quality data
+  pm10: number;
+  pm2_5: number;
+  european_aqi: number;
 };

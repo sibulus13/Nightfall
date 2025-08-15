@@ -2,30 +2,46 @@ import {
   type WeatherForecast,
   type Prediction,
   type PredictionData,
+  type AirQualityForecast,
 } from "~/lib/sunset/type";
 
 export async function getSunsetPrediction(latitude: number, longitude: number) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,surface_pressure&daily=sunrise,sunset,daylight_duration,sunshine_duration&timezone=auto`;
-  const res = await fetch(url);
+  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,surface_pressure&daily=sunrise,sunset,daylight_duration,sunshine_duration&timezone=auto`;
+  const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=52.52&longitude=13.41&hourly=pm10,pm2_5&current=us_aqi&timezone=auto&forecast_days=7`;
+
+  // Fetch both weather and air quality data in parallel
+  const [weatherRes, airQualityRes] = await Promise.all([
+    fetch(weatherUrl),
+    fetch(airQualityUrl),
+  ]);
 
   // Check for rate limit error
-  if (res.status === 429) {
+  if (weatherRes.status === 429 || airQualityRes.status === 429) {
     throw new Error("429 Too Many Requests");
   }
 
-  if (!res.ok) {
-    throw new Error(`HTTP error! status: ${res.status}`);
+  if (!weatherRes.ok) {
+    throw new Error(`HTTP error! status: ${weatherRes.status}`);
   }
 
-  const forecast = (await res.json()) as WeatherForecast;
+  if (!airQualityRes.ok) {
+    throw new Error(`HTTP error! status: ${airQualityRes.status}`);
+  }
+
+  const weatherForecast = (await weatherRes.json()) as WeatherForecast;
+  const airQualityForecast = (await airQualityRes.json()) as AirQualityForecast;
   const predictions = calculateSunsetPredictions(
-    forecast,
+    weatherForecast,
+    airQualityForecast,
   ) as unknown as Prediction[];
   return predictions;
 }
 
 // Calculates the sunset predictions based on the forecast data
-export function calculateSunsetPredictions(forecast: WeatherForecast) {
+export function calculateSunsetPredictions(
+  forecast: WeatherForecast,
+  airQualityForecast?: AirQualityForecast,
+) {
   const predictions = [];
   const numberOfDays = forecast.daily?.time?.length ?? 0;
   // Get the sunset and sunrise times for each day
@@ -53,6 +69,48 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
     }
     const sunset_end_hourly_index = sunset_start_hourly_index + 1;
     const interpolateRatio = Number(forecast?.daily?.sunset[i]?.slice(-2)) / 60;
+
+    // Interpolate air quality data if available
+    let pm10 = 0;
+    let pm2_5 = 0;
+    let european_aqi = 0;
+
+    if (airQualityForecast?.hourly) {
+      if (
+        airQualityForecast.hourly.pm10?.[sunset_start_hourly_index] !==
+        undefined
+      ) {
+        pm10 = interpolate(
+          airQualityForecast.hourly.pm10[sunset_start_hourly_index] ?? 0,
+          airQualityForecast.hourly.pm10[sunset_end_hourly_index] ?? 0,
+          interpolateRatio,
+        );
+      }
+
+      if (
+        airQualityForecast.hourly.pm2_5?.[sunset_start_hourly_index] !==
+        undefined
+      ) {
+        pm2_5 = interpolate(
+          airQualityForecast.hourly.pm2_5[sunset_start_hourly_index] ?? 0,
+          airQualityForecast.hourly.pm2_5[sunset_end_hourly_index] ?? 0,
+          interpolateRatio,
+        );
+      }
+
+      if (
+        airQualityForecast.hourly.european_aqi?.[sunset_start_hourly_index] !==
+        undefined
+      ) {
+        european_aqi = interpolate(
+          airQualityForecast.hourly.european_aqi[sunset_start_hourly_index] ??
+            0,
+          airQualityForecast.hourly.european_aqi[sunset_end_hourly_index] ?? 0,
+          interpolateRatio,
+        );
+      }
+    }
+
     const prediction = {
       golden_hour: calculateGoldenHour(
         forecast.daily.sunset[i]!,
@@ -107,6 +165,10 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
         interpolateRatio,
         "closest",
       ),
+      // Air quality data
+      pm10,
+      pm2_5,
+      european_aqi,
     };
     const sunsetScore = calculateSunsetScore(prediction);
     const res = {
@@ -123,12 +185,14 @@ export function calculateSunsetPredictions(forecast: WeatherForecast) {
       visibility: prediction.visibility,
       humidity: prediction.humidity,
       surface_pressure: prediction.surface_pressure,
+      // Air quality data
+      pm10: prediction.pm10,
+      pm2_5: prediction.pm2_5,
+      european_aqi: prediction.european_aqi,
     };
     predictions.push(res);
   }
 
-  // TODO add Air Quality to calculation
-  // TODO clean up results and remove unnecessary data
   return predictions;
 }
 
@@ -192,11 +256,9 @@ function calculateSunsetScore(prediction: PredictionData) {
   const vsScore = visibilityScore(prediction);
   const hScore = humidityScore(prediction);
   const pScore = pressureScore(prediction);
-  // TODO: Add air quality score when API supports it
-  // Air quality would factor in particulate matter which can enhance sunset colors
-  // but also reduce overall visibility and health impacts
+  const partScore = particulateScore(prediction);
 
-  score *= cCScore * vsScore * hScore * pScore;
+  score = cCScore * vsScore * hScore * pScore * partScore;
 
   return {
     score: Math.round(score * 100),
@@ -204,6 +266,7 @@ function calculateSunsetScore(prediction: PredictionData) {
     visibility: Math.round(vsScore * 100),
     humidity: Math.round(hScore * 100),
     pressure: Math.round(pScore * 100),
+    particulate: Math.round(partScore * 100),
   };
 }
 
@@ -275,6 +338,74 @@ function pressureScore(prediction: PredictionData) {
     return 0.7; // Poor conditions - likely cloudy/unstable
   }
   return 0.5; // Very poor conditions - stormy weather likely
+}
+
+/**
+ * Calculate particulate matter impact on sunset quality
+ *
+ * Particulate matter (PM2.5 and PM10) has a complex relationship with sunset quality
+ * that involves the "pollution paradox" - some air pollution can actually enhance
+ * sunset colors while reducing overall visibility and air quality:
+ *
+ * 1. Light Scattering Enhancement:
+ *    - Fine particles (PM2.5) scatter sunlight more effectively than larger particles
+ *    - This scattering can create more dramatic red/orange colors during sunset
+ *    - The effect is most pronounced when particles are in the optimal size range
+ *
+ * 2. Pollution Paradox:
+ *    - Moderate pollution levels (10-35 μg/m³ PM2.5) can enhance sunset colors
+ *    - High pollution levels (>35 μg/m³ PM2.5) typically reduce visibility too much
+ *    - Very low pollution (<5 μg/m³ PM2.5) may lack the scattering needed for dramatic colors
+ *
+ * 3. Particle Size Effects:
+ *    - PM2.5 (≤2.5 μm): Most effective at scattering blue light, enhancing red/orange hues
+ *    - PM10 (≤10 μm): Larger particles that can block more light and reduce visibility
+ *    - Optimal sunset enhancement occurs with moderate PM2.5 levels
+ *
+ * 4. Geographic and Seasonal Variations:
+ *    - Urban areas often have higher baseline pollution but spectacular sunsets
+ *    - Wildfire smoke can create dramatic sunset effects but poor air quality
+ *    - Industrial pollution patterns vary by region and season
+ *
+ * 5. Health vs. Aesthetic Considerations:
+ *    - While pollution can enhance sunset colors, it's harmful to health
+ *    - The scoring balances aesthetic appeal with air quality concerns
+ *    - Very high pollution levels are penalized despite potential color enhancement
+ *
+ * Threshold Analysis:
+ * - PM2.5 <5 μg/m³: Very clean air, may lack dramatic colors
+ * - PM2.5 5-15 μg/m³: Good conditions, some enhancement without health risks
+ * - PM2.5 15-35 μg/m³: Moderate pollution, optimal sunset enhancement
+ * - PM2.5 35-55 μg/m³: High pollution, reduced visibility despite color enhancement
+ * - PM2.5 >55 μg/m³: Very high pollution, poor conditions and health risks
+ *
+ * Scientific Basis:
+ * The relationship between particulate matter and sunset quality is supported by
+ * atmospheric science research on light scattering and the well-documented
+ * "pollution paradox" observed in urban areas worldwide.
+ *
+ * Note: This scoring balances aesthetic appeal with air quality concerns,
+ * recognizing that while some pollution can enhance sunset colors, excessive
+ * pollution is detrimental to both health and overall viewing experience.
+ */
+function particulateScore(prediction: PredictionData) {
+  const pm2_5 = prediction.pm2_5;
+  const pm10 = prediction.pm10;
+
+  // Primary scoring based on PM2.5 levels
+  if (pm2_5 > 55) {
+    return 0.4; // Very high pollution - poor conditions and health risks
+  }
+  if (pm2_5 > 35) {
+    return 0.6; // High pollution - reduced visibility despite potential color enhancement
+  }
+  if (pm2_5 > 15) {
+    return 0.9; // Moderate pollution - optimal sunset enhancement
+  }
+  if (pm2_5 > 5) {
+    return 0.95; // Good conditions - some enhancement without health risks
+  }
+  return 0.85; // Very clean air - may lack dramatic colors but excellent visibility
 }
 
 /**

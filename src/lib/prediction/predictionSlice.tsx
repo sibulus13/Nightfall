@@ -15,6 +15,7 @@ const dummyPredictionInstance: Prediction = {
     visibility: 0,
     humidity: 0,
     pressure: 0,
+    particulate: 0,
   },
   cloud_cover: 0,
   cloud_cover_low: 0,
@@ -23,6 +24,10 @@ const dummyPredictionInstance: Prediction = {
   visibility: 0,
   humidity: 0,
   surface_pressure: 1013.25,
+  // Air quality data
+  pm10: 0,
+  pm2_5: 0,
+  european_aqi: 0,
 };
 
 const initialPrediction = Array(6).fill(dummyPredictionInstance);

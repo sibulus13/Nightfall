@@ -155,7 +155,7 @@ export default function ExpandablePredictionCard({
               </div>
 
               {/* Compact Weather Info */}
-              <div className="grid grid-cols-4 gap-2 text-xs">
+              <div className="grid grid-cols-5 gap-2 text-xs">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="flex items-center gap-1">
@@ -226,6 +226,20 @@ export default function ExpandablePredictionCard({
                     <p>Total Cloud Coverage</p>
                   </TooltipContent>
                 </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1">
+                      <Cloud className="h-3 w-3 text-white/40" />
+                      <span className="text-white/80">
+                        {prediction.pm2_5?.toFixed(1) || "N/A"}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>PM2.5 (μg/m³)</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
 
               {/* Cloud Coverage - Compact */}
@@ -294,7 +308,7 @@ export default function ExpandablePredictionCard({
               </div>
 
               {/* Score Breakdown - Compact */}
-              <div className="grid grid-cols-5 gap-2 text-xs">
+              <div className="grid grid-cols-6 gap-2 text-xs">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="text-center">
@@ -348,6 +362,20 @@ export default function ExpandablePredictionCard({
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Pressure Score</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="text-center">
+                      <div className="text-white/80">Part</div>
+                      <div className="text-sm font-bold">
+                        {prediction.scores.particulate}%
+                      </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Particulate Score</p>
                   </TooltipContent>
                 </Tooltip>
 
