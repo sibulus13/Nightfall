@@ -181,14 +181,15 @@ export default function AppPage() {
       }
 
       // Debounce the API calls to avoid too many requests while dragging
-      mapLocationTimeoutRef.current = setTimeout(async () => {
+      mapLocationTimeoutRef.current = setTimeout(() => {
         // Get location name from coordinates
-        const name = await getLocationName(location.lat, location.lng);
-        if (name) setLocationName(name);
+        void getLocationName(location.lat, location.lng).then((name) => {
+          if (name) setLocationName(name);
+        });
 
         // Fetch predictions for the new location
-        await predict({ lat: location.lat, lon: location.lng });
-      }, 1000); // 1 second debounce
+        void predict({ lat: location.lat, lon: location.lng });
+      }, 5000); // 5 second debounce
     },
     [currentLocation, predict],
   );
