@@ -18,14 +18,13 @@ export type WeatherForecast = {
     visibility: number[];
     surface_pressure: number[];
     weather_code: number[];
-    // Enhanced parameters for better sunset scoring
     temperature_2m: number[];
     dew_point_2m: number[];
     wind_speed_10m: number[];
     wind_direction_10m: number[];
     precipitation_probability: number[];
-    cape: number[]; // Convective Available Potential Energy
-    cin: number[]; // Convective Inhibition
+    cape: number[]; // CAPE
+    cin: number[]; // CIN
     uv_index: number[];
     uv_index_clear_sky: number[];
   };
@@ -49,7 +48,6 @@ export type AirQualityForecast = {
     european_aqi_nitrogen_dioxide: number[];
     european_aqi_ozone: number[];
     european_aqi_sulphur_dioxide: number[];
-    // Enhanced air quality parameters
     aerosol_optical_depth: number[];
     aerosol_optical_depth_1020nm: number[];
     alder_pollen: number[];
@@ -85,7 +83,6 @@ export type Prediction = {
     ozone: number;
     nitrogenDioxide: number;
   };
-  // Detailed weather information
   cloud_cover: number;
   cloud_cover_low: number;
   cloud_cover_mid: number;
@@ -93,7 +90,6 @@ export type Prediction = {
   visibility: number;
   humidity: number;
   surface_pressure: number;
-  // Enhanced weather parameters
   temperature_2m: number;
   dew_point_2m: number;
   wind_speed_10m: number;
@@ -103,11 +99,9 @@ export type Prediction = {
   cin: number;
   uv_index: number;
   uv_index_clear_sky: number;
-  // Air quality data
   pm10: number;
   pm2_5: number;
   european_aqi: number;
-  // Enhanced air quality parameters
   aerosol_optical_depth: number;
   ozone: number;
   nitrogen_dioxide: number;
@@ -134,7 +128,6 @@ export type PredictionData = {
   humidity: number;
   surface_pressure: number;
   weather_code: number;
-  // Enhanced weather parameters
   temperature_2m: number;
   dew_point_2m: number;
   wind_speed_10m: number;
@@ -144,11 +137,9 @@ export type PredictionData = {
   cin: number;
   uv_index: number;
   uv_index_clear_sky: number;
-  // Air quality data
   pm10: number;
   pm2_5: number;
   european_aqi: number;
-  // Enhanced air quality parameters
   aerosol_optical_depth: number;
   ozone: number;
   nitrogen_dioxide: number;

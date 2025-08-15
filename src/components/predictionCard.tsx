@@ -365,7 +365,7 @@ export default function PredictionCard({
                     </TooltipContent>
                   </Tooltip>
 
-                  {/* TODO correct these calcuations */}
+                  {/* TODO: Fix calculations */}
                   {/* <Tooltip>
                      <TooltipTrigger asChild>
                        <div className="flex items-center justify-between">

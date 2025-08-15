@@ -41,7 +41,7 @@ export default function RootLayout({
       {NEXT_PUBLIC_GOOGLE_TAG_ID && (
         <GoogleAnalytics gaId={NEXT_PUBLIC_GOOGLE_TAG_ID} />
       )}
-      {/* TODO google analytics isn't set up properly */}
+      {/* TODO: Setup Google Analytics */}
     </html>
   );
 }

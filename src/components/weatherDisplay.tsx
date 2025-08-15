@@ -23,7 +23,6 @@ export default function WeatherDisplay({
 }) {
   const weather = getWeatherCondition(weatherCode);
   return (
-    // TODO why is the tool tip text not showing?
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>

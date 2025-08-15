@@ -8,7 +8,7 @@ import {
 export async function getSunsetPrediction(latitude: number, longitude: number) {
   const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=sunrise,sunset,daylight_duration,sunshine_duration&hourly=temperature_2m,weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,surface_pressure,dew_point_2m,wind_speed_10m,wind_direction_10m,precipitation_probability,uv_index,uv_index_clear_sky,cape&timezone=auto`;
   const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&hourly=pm10,pm2_5,ozone,nitrogen_dioxide,aerosol_optical_depth&current=us_aqi&timezone=auto&forecast_days=7`;
-  // Fetch both weather and air quality data in parallel
+  // Fetch weather and air quality data
   const [weatherRes, airQualityRes] = await Promise.all([
     fetch(weatherUrl),
     fetch(airQualityUrl),
@@ -36,14 +36,14 @@ export async function getSunsetPrediction(latitude: number, longitude: number) {
   return predictions;
 }
 
-// Calculates the sunset predictions based on the forecast data
+// Calculate sunset predictions
 export function calculateSunsetPredictions(
   forecast: WeatherForecast,
   airQualityForecast?: AirQualityForecast,
 ) {
   const predictions = [];
   const numberOfDays = forecast.daily?.time?.length ?? 0;
-  // Get the sunset and sunrise times for each day
+  // Process each day
   for (let i = 0; i < numberOfDays; i++) {
     const sunsetTime = forecast?.daily?.sunset[i];
     if (!sunsetTime) {
@@ -69,7 +69,7 @@ export function calculateSunsetPredictions(
     const sunset_end_hourly_index = sunset_start_hourly_index + 1;
     const interpolateRatio = Number(forecast?.daily?.sunset[i]?.slice(-2)) / 60;
 
-    // Interpolate air quality data if available
+    // Interpolate air quality data
     let pm10 = 0;
     let pm2_5 = 0;
     let european_aqi = 0;
@@ -362,38 +362,22 @@ function interpolate(start: number, end: number, ratio: number, type?: string) {
  *    - High pollution reduces visibility and overall quality
  *    - Very low pollution may lack dramatic scattering effects
  *
- * TODO: Additional factors to consider for enhanced scoring:
- * - Wind speed and direction (affects cloud movement and atmospheric stability)
- * - Temperature and temperature gradient (affects atmospheric density and light refraction)
- * - Ozone levels (affects UV scattering and color perception)
- * - Aerosol optical depth (more precise than PM2.5/PM10 for light scattering)
- * - Solar elevation angle (affects light path length through atmosphere)
- * - Geographic location factors (altitude, latitude, proximity to water bodies)
- * - Seasonal adjustments (different optimal ranges for different seasons)
- * - Time of year (affects sun angle and atmospheric conditions)
- * - Weather system type (high pressure vs low pressure systems)
- * - Cloud type classification (cirrus vs cumulus vs stratus)
- * - Atmospheric moisture content (dew point vs relative humidity)
- * - Air mass characteristics (maritime vs continental)
- * - Urban heat island effects (affects local atmospheric conditions)
- * - Wildfire smoke presence and type
- * - Industrial pollution patterns
- * - Volcanic aerosol effects
- * - Saharan dust events
- * - Marine layer effects (coastal areas)
- * - Mountain wave effects (orographic lifting)
+ * TODO: Additional factors:
+ * - Wind speed/direction, temperature gradient, ozone levels
+ * - Aerosol optical depth, solar elevation angle
+ * - Geographic factors (altitude, latitude, water proximity)
+ * - Seasonal adjustments, weather system type
+ * - Cloud classification, atmospheric moisture
+ * - Air mass characteristics, urban heat island effects
+ * - Wildfire smoke, industrial pollution, volcanic aerosols
+ * - Saharan dust, marine layer, mountain wave effects
  *
- * TODO: Scoring methodology improvements:
- * - Implement weighted scoring instead of pure multiplicative
- * - Add seasonal and geographic calibration factors
- * - Include confidence intervals for predictions
- * - Add machine learning model for pattern recognition
- * - Implement ensemble methods combining multiple scoring approaches
- * - Add real-time feedback loop from user ratings
- * - Include historical accuracy tracking
- * - Add uncertainty quantification for predictions
- * - Implement adaptive thresholds based on location
- * - Add time-of-day specific adjustments
+ * TODO: Scoring improvements:
+ * - Weighted scoring, seasonal/geographic calibration
+ * - Confidence intervals, ML pattern recognition
+ * - Ensemble methods, user feedback loop
+ * - Historical accuracy, uncertainty quantification
+ * - Adaptive thresholds, time-of-day adjustments
  *
  * The scoring uses a multiplicative approach where each factor can reduce the overall score.
  * This reflects the reality that any single factor can significantly impact sunset quality.
@@ -425,18 +409,16 @@ function calculateSunsetScore(prediction: PredictionData) {
     wScore,
     tScore,
   ];
-  // Use multiplicative scoring for more realistic range
-  // This creates better differentiation between good and poor conditions
+  // Multiplicative scoring for realistic range
   let score = scores_to_use.reduce((acc, curr) => acc * curr, 1);
 
-  // Apply bonus for excellent conditions (multiple high scores)
+  // Bonus for excellent conditions
   const excellentFactors = scores_to_use.filter((score) => score >= 0.9).length;
-
   for (let i = 0; i < excellentFactors; i++) {
     score *= 1.1;
-  } // to balance out low scores, we multiply the score by 1.1 for each excellent factor
+  }
 
-  // Ensure score stays within reasonable bounds
+  // Keep score in bounds
   score = Math.max(0.05, Math.min(1.01, score));
 
   return {
@@ -491,35 +473,14 @@ function calculateSunsetScore(prediction: PredictionData) {
  *    - Coastal areas may have different optimal pressure ranges than inland regions
  *    - Altitude affects baseline pressure readings and interpretation
  *
- * TODO: Pressure scoring improvements:
- * - Add pressure trend analysis (rising vs falling)
- * - Include pressure gradient calculations
- * - Add pressure altitude corrections
- * - Implement pressure seasonal adjustments
- * - Add pressure geographic variations
- * - Include pressure system type classification
- * - Add pressure front effects
- * - Implement pressure trough effects
- * - Add pressure ridge effects
- * - Include pressure cyclone effects
- * - Add pressure anticyclone effects
- * - Implement pressure convergence effects
- * - Add pressure divergence effects
- * - Include pressure advection effects
- * - Add pressure vertical structure analysis
- * - Implement pressure temporal patterns
- * - Add pressure spatial patterns
- * - Include pressure weather system correlations
- * - Add pressure wind interactions
- * - Implement pressure temperature interactions
- * - Add pressure humidity interactions
- * - Include pressure cloud interactions
- * - Add pressure visibility interactions
- * - Implement pressure aerosol interactions
- * - Add pressure urban effects
- * - Include pressure topographic effects
- * - Add pressure maritime effects
- * - Implement pressure continental effects
+ * TODO: Pressure improvements:
+ * - Trend analysis, gradient calculations, altitude corrections
+ * - Seasonal/geographic adjustments, system classification
+ * - Front/trough/ridge effects, cyclone/anticyclone effects
+ * - Convergence/divergence, advection, vertical structure
+ * - Temporal/spatial patterns, weather correlations
+ * - Wind/temperature/humidity/cloud/visibility/aerosol interactions
+ * - Urban/topographic/maritime/continental effects
  *
  * Threshold Analysis:
  * - >1020 hPa: Excellent conditions, clear skies, stable atmosphere
@@ -600,37 +561,17 @@ function pressureScore(prediction: PredictionData) {
  *    - The scoring balances aesthetic appeal with air quality concerns
  *    - Very high pollution levels are penalized despite potential color enhancement
  *
- * TODO: Particulate scoring improvements:
- * - Add aerosol optical depth measurements (more precise than PM2.5/PM10)
- * - Include particle size distribution analysis
- * - Add particle composition analysis (organic vs inorganic)
- * - Implement particle source identification (traffic, industry, natural)
- * - Add particle temporal patterns (diurnal, seasonal)
- * - Include particle spatial distribution analysis
- * - Add particle vertical profile analysis
- * - Implement particle aging effects
- * - Add particle hygroscopic growth effects
- * - Include particle coagulation effects
- * - Add particle deposition effects
- * - Implement particle transport effects
- * - Add particle transformation effects
- * - Include particle chemical composition effects
- * - Add particle optical properties analysis
- * - Implement particle radiative effects
- * - Add particle cloud interactions
- * - Include particle precipitation effects
- * - Add particle wind effects
- * - Implement particle temperature effects
- * - Add particle humidity effects
- * - Include particle pressure effects
- * - Add particle visibility interactions
- * - Implement particle color effects
- * - Add particle health impact considerations
- * - Include particle environmental impact considerations
- * - Add particle regulatory compliance considerations
- * - Implement particle forecasting capabilities
- * - Add particle historical trend analysis
- * - Include particle climate change effects
+ * TODO: Particulate improvements:
+ * - Aerosol optical depth, particle size distribution
+ * - Composition analysis, source identification
+ * - Temporal/spatial patterns, vertical profile
+ * - Aging/hygroscopic/coagulation effects
+ * - Deposition/transport/transformation effects
+ * - Chemical composition, optical properties
+ * - Radiative effects, cloud/precipitation interactions
+ * - Wind/temperature/humidity/pressure effects
+ * - Visibility/color effects, health/environmental impact
+ * - Regulatory compliance, forecasting, historical trends
  *
  * Threshold Analysis:
  * - PM2.5 <5 μg/m³: Very clean air, may lack dramatic colors
@@ -698,31 +639,14 @@ function particulateScore(prediction: PredictionData) {
  * 4. Color Saturation: Lower humidity typically results in more vibrant, saturated
  *    colors because there's less atmospheric interference with the light path.
  *
- * TODO: Humidity scoring improvements:
- * - Add dew point temperature considerations (more accurate than relative humidity)
- * - Include absolute humidity measurements (g/m³)
- * - Add humidity gradient analysis (surface vs elevated)
- * - Implement humidity temporal patterns (morning vs evening)
- * - Add humidity geographic variations (coastal vs inland)
- * - Include humidity seasonal adjustments
- * - Add humidity temperature interactions
- * - Implement humidity pressure interactions
- * - Add humidity wind effects
- * - Include humidity cloud interactions
- * - Add humidity aerosol interactions
- * - Implement humidity condensation effects
- * - Add humidity evaporation effects
- * - Include humidity precipitation effects
- * - Add humidity fog formation effects
- * - Implement humidity haze formation effects
- * - Add humidity mirage effects
- * - Include humidity refraction effects
- * - Add humidity absorption effects
- * - Implement humidity emission effects
- * - Add humidity urban heat island effects
- * - Include humidity agricultural effects
- * - Add humidity water body effects
- * - Implement humidity vegetation effects
+ * TODO: Humidity improvements:
+ * - Dew point temperature, absolute humidity measurements
+ * - Gradient analysis, temporal patterns, geographic variations
+ * - Seasonal adjustments, temperature/pressure interactions
+ * - Wind/cloud/aerosol interactions, condensation/evaporation
+ * - Precipitation effects, fog/haze formation
+ * - Mirage/refraction/absorption/emission effects
+ * - Urban heat island, agricultural/water body/vegetation effects
  *
  * Thresholds are based on typical atmospheric conditions:
  * - <40%: Excellent conditions, minimal scattering
@@ -773,29 +697,14 @@ function humidityScore(prediction: PredictionData) {
  *    scattering effects are amplified. This is why sunsets are more colorful than
  *    midday sun.
  *
- * TODO: Visibility scoring improvements:
- * - Integrate with PM2.5/PM10 data for better pollution paradox modeling
- * - Add aerosol optical depth measurements (more precise than visibility)
- * - Include atmospheric extinction coefficient calculations
- * - Add visibility trend analysis (improving vs deteriorating)
- * - Implement visibility quality assessment (uniform vs patchy)
- * - Add visibility depth analysis (surface vs elevated)
- * - Include visibility color analysis (white vs colored haze)
- * - Add visibility temporal patterns (morning vs evening)
- * - Implement visibility geographic variations (urban vs rural)
- * - Add visibility seasonal adjustments
- * - Include visibility weather system correlations
- * - Add visibility altitude effects
- * - Implement visibility humidity interactions
- * - Add visibility temperature effects
- * - Include visibility wind effects
- * - Add visibility precipitation effects
- * - Implement visibility fog/mist specific handling
- * - Add visibility dust/sand storm effects
- * - Include visibility wildfire smoke effects
- * - Add visibility industrial pollution patterns
- * - Implement visibility marine layer effects
- * - Add visibility mountain wave effects
+ * TODO: Visibility improvements:
+ * - PM2.5/PM10 integration, aerosol optical depth
+ * - Extinction coefficient, trend analysis, quality assessment
+ * - Depth/color analysis, temporal patterns, geographic variations
+ * - Seasonal adjustments, weather correlations, altitude effects
+ * - Humidity/temperature/wind interactions, precipitation effects
+ * - Fog/mist handling, dust/sand storms, wildfire smoke
+ * - Industrial pollution, marine layer, mountain wave effects
  *
  * Threshold Analysis:
  * - <10km: Poor visibility, likely heavy pollution or weather conditions
@@ -853,27 +762,14 @@ function visibilityScore(prediction: PredictionData) {
  *    - Too much (>90%): Blocks too much light
  *    - Sweet spot: 30-50% for optimal balance
  *
- * TODO: Cloud scoring improvements:
- * - Implement separate weighted scoring for mid vs high clouds
- * - Add cloud type classification (cirrus vs cumulus vs stratus)
- * - Include cloud base height in scoring calculations
- * - Add cloud thickness/density considerations
- * - Implement cloud movement patterns (stationary vs moving)
- * - Add cloud edge effects (sharp vs diffuse boundaries)
- * - Include cloud color analysis (white vs gray vs colored)
- * - Add cloud formation patterns (organized vs scattered)
- * - Implement seasonal cloud pattern adjustments
- * - Add geographic cloud pattern variations
- * - Include cloud optical depth measurements
- * - Add cloud particle size distribution effects
- * - Implement cloud phase effects (ice vs water droplets)
- * - Add cloud shadow effects on ground conditions
- * - Include cloud reflection effects on water bodies
- * - Add cloud-induced wind effects
- * - Implement cloud temperature gradient effects
- * - Add cloud moisture content considerations
- * - Include cloud aerosol interactions
- * - Add cloud radiative effects
+ * TODO: Cloud improvements:
+ * - Separate mid/high cloud scoring, cloud type classification
+ * - Base height, thickness/density, movement patterns
+ * - Edge effects, color analysis, formation patterns
+ * - Seasonal/geographic adjustments, optical depth
+ * - Particle size distribution, phase effects (ice/water)
+ * - Shadow/reflection effects, wind/temperature interactions
+ * - Moisture content, aerosol interactions, radiative effects
  *
  * The scoring algorithm prioritizes:
  * - Low cloud coverage (inverse relationship)

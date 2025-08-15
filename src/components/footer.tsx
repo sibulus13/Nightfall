@@ -15,7 +15,7 @@ export default function Footer() {
           About
         </Link>
       </div>
-      {/* TODO add other sections such as feature request, terms of service */}
+      {/* TODO: Add feature request, terms of service */}
     </footer>
   );
 }
