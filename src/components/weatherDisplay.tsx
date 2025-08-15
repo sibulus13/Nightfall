@@ -36,7 +36,7 @@ export default function WeatherDisplay({
   );
 }
 
-export function getWeatherCondition(weatherCode: number, size = 48) {
+export function getWeatherCondition(weatherCode: number, size = 70) {
   switch (weatherCode) {
     case 0:
       return { text: "Clear sky", icon: <WiDaySunny size={size} /> };

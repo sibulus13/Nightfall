@@ -91,31 +91,31 @@ export default function PredictionCard({
               {formatDate(prediction.sunset_time)}
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex min-h-[200px] flex-col justify-between">
+          <CardContent className="min-h-[250px] flex-1 flex-col">
             {/* Basic View */}
             <div
-              className={`flex flex-col justify-between transition-all duration-500 ease-in-out ${
+              className={`flex h-full w-full flex-col justify-between p-6 transition-all duration-500 ease-in-out ${
                 isDetailed ? "pointer-events-none opacity-0" : "opacity-100"
               }`}
             >
-              {/* Basic Info */}
-              <div className="flex items-center justify-between">
+              {/* Score and Weather Section */}
+              <div className="flex flex-1 items-center justify-between">
                 <WeatherDisplay weatherCode={prediction.weather_code} />
-                <div className="flex items-center justify-center">
-                  <TbSunset2 className="mb-2 h-12 w-12 text-yellow-300" />
+                <div className="flex flex-col items-center justify-center">
+                  <TbSunset2 className="mb-3 h-16 w-16 text-yellow-300" />
                   <span className="text-4xl font-bold">
                     {truncateScore(prediction.score) + "%"}
                   </span>
                 </div>
               </div>
 
-              {/* Time Info */}
-              <div className="flex justify-center gap-1 pt-2">
+              {/* Time Info Section */}
+              <div className="flex items-center justify-center gap-3 pt-6">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="flex items-center space-x-1">
-                      <Hourglass className="h-6 w-6 text-yellow-300" />
-                      <span className="text-sm">
+                    <div className="flex items-center space-x-2 rounded-lg bg-white/10 px-3 py-2">
+                      <Hourglass className="h-4 w-4 text-yellow-300" />
+                      <span className="text-sm font-medium">
                         {formatTime(prediction.golden_hour.start)}
                       </span>
                     </div>
@@ -124,12 +124,12 @@ export default function PredictionCard({
                     <p>Golden Hour Start</p>
                   </TooltipContent>
                 </Tooltip>
-                -
+                <span className="text-white/50">-</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="flex items-center space-x-1">
-                      <BsSunset className="h-6 w-6 text-orange-300" />
-                      <span className="text-sm">
+                    <div className="flex items-center space-x-2 rounded-lg bg-white/10 px-3 py-2">
+                      <BsSunset className="h-4 w-4 text-orange-300" />
+                      <span className="text-sm font-medium">
                         {formatTime(prediction.sunset_time)}
                       </span>
                     </div>
@@ -164,7 +164,7 @@ export default function PredictionCard({
                   Factor Scores
                 </div>
 
-                {/* Primary Factors - 2 columns */}
+                {/* Primary Factors - Only showing scores used in calculation */}
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -320,139 +320,6 @@ export default function PredictionCard({
                       </p>
                     </TooltipContent>
                   </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center justify-between">
-                        <span className="text-white/80">Stability</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-white/70">
-                            {prediction.cape?.toFixed(0) || "N/A"} J/kg
-                          </span>
-                          <span className="font-bold text-white">
-                            {prediction.scores.stability}%
-                          </span>
-                        </div>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Stability Score</p>
-                      <p className="text-xs text-gray-300">
-                        Based on CAPE & CIN (J/kg)
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center justify-between">
-                        <span className="text-white/80">UV Index</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-white/70">
-                            {prediction.uv_index?.toFixed(1) || "N/A"}
-                          </span>
-                          <span className="font-bold text-white">
-                            {prediction.scores.uv}%
-                          </span>
-                        </div>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>UV Index Score</p>
-                      <p className="text-xs text-gray-300">
-                        Based on UV index (0-11+)
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-
-                  {/* TODO: Fix calculations */}
-                  {/* <Tooltip>
-                     <TooltipTrigger asChild>
-                       <div className="flex items-center justify-between">
-                         <span className="text-white/80">AOD</span>
-                         <div className="flex items-center gap-2">
-                           <span className="text-white/70 text-xs">
-                             {prediction.aerosol_optical_depth?.toFixed(2) || "N/A"}
-                           </span>
-                           <span className="text-white font-bold">
-                             {prediction.scores.aerosolOpticalDepth}%
-                           </span>
-                         </div>
-                       </div>
-                     </TooltipTrigger>
-                     <TooltipContent>
-                       <p>Aerosol Optical Depth Score</p>
-                       <p className="text-xs text-gray-300">
-                         Based on AOD (0-1+)
-                       </p>
-                     </TooltipContent> */}
-                  {/* </Tooltip> */}
-
-                  {/* <Tooltip>
-                     <TooltipTrigger asChild>
-                       <div className="flex items-center justify-between">
-                         <span className="text-white/80">AQI</span>
-                         <div className="flex items-center gap-2">
-                           <span className="text-white/70 text-xs">
-                             {prediction.european_aqi?.toFixed(0) || "N/A"}
-                           </span>
-                           <span className="text-white font-bold">
-                             {prediction.scores.europeanAQI}%
-                           </span>
-                         </div>
-                       </div>
-                     </TooltipTrigger>
-                     <TooltipContent>
-                       <p>European Air Quality Index Score</p>
-                       <p className="text-xs text-gray-300">
-                         Based on European AQI (0-100+)
-                       </p>
-                     </TooltipContent>
-                   </Tooltip> */}
-
-                  {/* <Tooltip>
-                     <TooltipTrigger asChild>
-                       <div className="flex items-center justify-between">
-                         <span className="text-white/80">O₃</span>
-                         <div className="flex items-center gap-2">
-                           <span className="text-white/70 text-xs">
-                             {prediction.ozone?.toFixed(0) || "N/A"} μg/m³
-                           </span>
-                           <span className="text-white font-bold">
-                             {prediction.scores.ozone}%
-                           </span>
-                         </div>
-                       </div>
-                     </TooltipTrigger>
-                     <TooltipContent>
-                       <p>Ozone Score</p>
-                       <p className="text-xs text-gray-300">
-                         Based on ozone (μg/m³)
-                       </p>
-                     </TooltipContent>
-                   </Tooltip> */}
-
-                  {/* <Tooltip>
-                     <TooltipTrigger asChild>
-                       <div className="flex items-center justify-between">
-                         <span className="text-white/80">NO₂</span>
-                         <div className="flex items-center gap-2">
-                           <span className="text-white/70 text-xs">
-                             {prediction.nitrogen_dioxide?.toFixed(0) || "N/A"} μg/m³
-                           </span>
-                           <span className="text-white font-bold">
-                             {prediction.scores.nitrogenDioxide}%
-                           </span>
-                         </div>
-                       </div>
-                     </TooltipTrigger>
-                     <TooltipContent>
-                       <p>Nitrogen Dioxide Score</p>
-                       <p className="text-xs text-gray-300">
-                         Based on NO₂ (μg/m³)
-                       </p>
-                     </TooltipContent>
-                   </Tooltip> */}
                 </div>
 
                 {/* Overall Score */}
