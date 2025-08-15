@@ -87,7 +87,7 @@ export const useMapData = ({
 
         for (let row = 0; row < adjustedGridRows; row++) {
             // Stagger each row by offsetting the longitude
-            const rowOffset = (row % 2) * (lngStep * 0.5);
+            const rowOffset = ((row + 1) % 2) * (lngStep * 0.5);
 
             for (let col = 0; col < adjustedGridColumns; col++) {
                 const lat = paddedSouth + latStep * row;
