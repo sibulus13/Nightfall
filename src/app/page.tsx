@@ -48,19 +48,19 @@ export default function MainPage() {
 
   return (
     <div className="page items-center gap-24">
-      <div className="flex h-[calc(85vh)] w-screen flex-col bg-gradient-to-b from-transparent via-pink-300 to-transparent lg:w-[calc(100vw-10px)]">
+      <div className="flex h-[calc(85vh)] w-screen flex-col bg-gradient-to-b from-transparent via-pink-300/80 to-transparent dark:via-pink-400/60 lg:w-[calc(100vw-10px)]">
         {/* Janky lg-w screen to full screen without scroll bar */}
         {/* Headline */}
         <div className="flex grow flex-col items-center justify-center">
           <h1 className="text-center text-4xl font-bold md:text-5xl">
             Find the Perfect
-            <span className="bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent dark:from-pink-400 dark:to-purple-400">
               {" "}
               Sunset Times{" "}
             </span>
             & Golden Hour
           </h1>
-          <p className="mt-4 max-w-2xl text-center text-lg md:text-xl">
+          <p className="mt-4 max-w-2xl text-center text-lg text-foreground md:text-xl">
             Get accurate sunset predictions, golden hour timing, and weather
             forecasts to capture stunning sunset photos anywhere in the world.
           </p>
@@ -72,7 +72,7 @@ export default function MainPage() {
         </div>
         <button
           onClick={() => scrollIntoTheView("features-section")}
-          className="flex items-center justify-center"
+          className="flex items-center justify-center text-foreground transition-colors hover:text-muted-foreground"
         >
           <CiSaveDown1 className="h-12 w-12" />
         </button>
@@ -85,11 +85,11 @@ export default function MainPage() {
 
         <div className="grid w-full max-w-6xl gap-8 px-4 md:grid-cols-3">
           <div className="flex flex-col items-center text-center">
-            <GrScorecard className="mb-4 h-20 w-20 text-orange-500" />
-            <h3 className="mb-3 text-xl font-semibold">
+            <GrScorecard className="mb-4 h-20 w-20 text-orange-500 dark:text-orange-400" />
+            <h3 className="mb-3 text-xl font-semibold text-foreground">
               Accurate Sunset Scores
             </h3>
-            <p className="leading-relaxed text-gray-600">
+            <p className="leading-relaxed text-muted-foreground">
               Get precise sunset quality predictions with our advanced scoring
               system. Know exactly when the best sunset times are for any
               location, with detailed weather conditions and atmospheric quality
@@ -99,8 +99,10 @@ export default function MainPage() {
 
           <div className="flex flex-col items-center text-center">
             <FcGlobe className="mb-4 h-20 w-20" />
-            <h3 className="mb-3 text-xl font-semibold">Worldwide Coverage</h3>
-            <p className="leading-relaxed text-gray-600">
+            <h3 className="mb-3 text-xl font-semibold text-foreground">
+              Worldwide Coverage
+            </h3>
+            <p className="leading-relaxed text-muted-foreground">
               From the beaches of Hawaii to the mountains of Switzerland, our
               sunset predictions work globally. Find the best sunset viewing
               spots and golden hour times anywhere in the world.
@@ -109,8 +111,10 @@ export default function MainPage() {
 
           <div className="flex flex-col items-center text-center">
             <FcOldTimeCamera className="mb-4 h-20 w-20" />
-            <h3 className="mb-3 text-xl font-semibold">Photographer's Dream</h3>
-            <p className="leading-relaxed text-gray-600">
+            <h3 className="mb-3 text-xl font-semibold text-foreground">
+              Photographer&apos;s Dream
+            </h3>
+            <p className="leading-relaxed text-muted-foreground">
               Perfect for photographers! Get golden hour timing, weather
               forecasts, and sunset quality scores to plan your shoots. Never
               miss the perfect lighting conditions for stunning sunset
@@ -123,14 +127,16 @@ export default function MainPage() {
       {/* Story Section */}
       <div className="flex flex-col items-center pb-8 pt-16">
         <div className="max-w-4xl px-4 text-center">
-          <h2 className="mb-6 text-2xl font-bold">The Perfect Sunset Awaits</h2>
-          <p className="mb-6 text-lg leading-relaxed text-gray-700">
-            Whether you're a professional photographer seeking the perfect
+          <h2 className="mb-6 text-2xl font-bold text-foreground">
+            The Perfect Sunset Awaits
+          </h2>
+          <p className="mb-6 text-lg leading-relaxed text-muted-foreground">
+            Whether you&apos;re a professional photographer seeking the perfect
             golden hour, a traveler wanting to experience breathtaking sunsets,
             or simply someone who loves to watch the sky paint itself in
             brilliant colors, Nightfalls is your ultimate sunset companion.
           </p>
-          <p className="text-lg leading-relaxed text-gray-700">
+          <p className="text-lg leading-relaxed text-muted-foreground">
             Our advanced algorithms analyze weather patterns, atmospheric
             conditions, and seasonal factors to give you the most accurate
             sunset predictions available. Plan your sunset viewing, photography
