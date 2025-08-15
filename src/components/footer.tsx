@@ -14,6 +14,14 @@ export default function Footer() {
         <Link className="mx-2 underline" href="/About">
           About
         </Link>
+        <a
+          className="mx-2 underline"
+          href="https://github.com/sibulus13/Nightfall"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          GitHub
+        </a>
       </div>
       {/* TODO: Add feature request, terms of service */}
     </footer>
