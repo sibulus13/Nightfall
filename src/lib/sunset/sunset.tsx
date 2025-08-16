@@ -511,22 +511,17 @@ function pressureScore(prediction: PredictionData) {
   // Normalize pressure to sea level if needed (most weather APIs provide this)
   const pressure = prediction.surface_pressure;
 
-  if (pressure > 1020) {
-    return 1.0; // Excellent conditions - clear skies, stable atmosphere
-  }
-  if (pressure > 1010) {
-    return 0.95; // Good conditions - typical fair weather
-  }
-  if (pressure > 1000) {
-    return 0.9; // Fair conditions - some atmospheric instability
-  }
-  if (pressure > 990) {
-    return 0.8; // Poor conditions - likely cloudy/unstable
-  }
-  if (pressure > 980) {
-    return 0.65; // Very poor conditions - stormy weather likely
-  }
-  return 0.5; // Extremely poor conditions - severe weather
+  // Linear gradient between pressure thresholds
+  // Max score 1.0 at 1020+ hPa
+  // Min score 0.5 at 980- hPa
+  const maxPressure = 1020;
+  const minPressure = 980;
+  const maxScore = 1.0;
+  const minScore = 0.5;
+
+  const clampedPressure = Math.min(Math.max(pressure, minPressure), maxPressure);
+  const normalizedPressure = (clampedPressure - minPressure) / (maxPressure - minPressure);
+  return minScore + normalizedPressure * (maxScore - minScore);
 }
 
 /**
