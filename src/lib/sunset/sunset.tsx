@@ -843,18 +843,18 @@ function cloudCoverageScore(prediction: PredictionData) {
   let highCloudScore = 1.0;
   if (highCover > 80) {
     // Too much high cloud coverage can block light
-    highCloudScore = 0.7;
+    highCloudScore = 0.6;
   } else if (highCover >= 60 && highCover <= 80) {
     // Suboptimal but still decent range
-    highCloudScore = 0.85;
+    highCloudScore = 0.8;
   } else if (highCover >= 40 && highCover <= 60) {
     // Optimal range for dramatic effects
     highCloudScore = 1.0;
-  } else if (highCover < 40) {
-    // Good range
-    highCloudScore = 0.9;
   } else if (highCover < 20) {
     // Some high clouds are better than none
+    highCloudScore = 0.5;
+  } else if (highCover < 40) {
+    // Good range
     highCloudScore = 0.8;
   }
 
@@ -924,6 +924,8 @@ function cloudCoverageScore(prediction: PredictionData) {
     interactionBonus.toFixed(2),
     "Seasonal Adjustment:",
     seasonalAdjustment.toFixed(2),
+    "Final Score:",
+    score.toFixed(2),
   );
   return score;
 }
