@@ -253,12 +253,12 @@ export default function PredictionCard({
                     <TooltipTrigger asChild>
                       <div className="flex items-center justify-between">
                         <span className="text-white/80">Visibility</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-white/70">
-                            {formatVisibility(prediction.visibility)}
-                          </span>
+                        <div className="flex flex-col items-end">
                           <span className="font-bold text-white">
                             {prediction.scores.visibility}%
+                          </span>
+                          <span className="text-xs text-white/70">
+                            {formatVisibility(prediction.visibility)}
                           </span>
                         </div>
                       </div>
@@ -275,12 +275,12 @@ export default function PredictionCard({
                     <TooltipTrigger asChild>
                       <div className="flex items-center justify-between">
                         <span className="text-white/80">Humidity</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-white/70">
-                            {prediction.humidity.toFixed(0)}%
-                          </span>
+                        <div className="flex flex-col items-end">
                           <span className="font-bold text-white">
                             {prediction.scores.humidity}%
+                          </span>
+                          <span className="text-xs text-white/70">
+                            {prediction.humidity.toFixed(0)}%
                           </span>
                         </div>
                       </div>
@@ -297,12 +297,12 @@ export default function PredictionCard({
                     <TooltipTrigger asChild>
                       <div className="flex items-center justify-between">
                         <span className="text-white/80">Pressure</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-white/70">
-                            {formatPressure(prediction.surface_pressure)}
-                          </span>
+                        <div className="flex flex-col items-end">
                           <span className="font-bold text-white">
                             {prediction.scores.pressure}%
+                          </span>
+                          <span className="text-xs text-white/70">
+                            {formatPressure(prediction.surface_pressure)}
                           </span>
                         </div>
                       </div>
@@ -319,12 +319,12 @@ export default function PredictionCard({
                     <TooltipTrigger asChild>
                       <div className="flex items-center justify-between">
                         <span className="text-white/80">Particulate</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-white/70">
-                            {prediction.pm2_5?.toFixed(1) || "N/A"} μg/m³
-                          </span>
+                        <div className="flex flex-col items-end">
                           <span className="font-bold text-white">
                             {prediction.scores.particulate}%
+                          </span>
+                          <span className="text-xs text-white/70">
+                            {prediction.pm2_5?.toFixed(1) || "N/A"} μg/m³
                           </span>
                         </div>
                       </div>
@@ -341,13 +341,13 @@ export default function PredictionCard({
                     <TooltipTrigger asChild>
                       <div className="flex items-center justify-between">
                         <span className="text-white/80">Wind</span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col items-end">
+                          <span className="font-bold text-white">
+                            {prediction.scores.wind}%
+                          </span>
                           <span className="text-xs text-white/70">
                             {prediction.wind_speed_10m?.toFixed(1) || "N/A"}{" "}
                             km/h
-                          </span>
-                          <span className="font-bold text-white">
-                            {prediction.scores.wind}%
                           </span>
                         </div>
                       </div>
@@ -364,12 +364,12 @@ export default function PredictionCard({
                     <TooltipTrigger asChild>
                       <div className="flex items-center justify-between">
                         <span className="text-white/80">Temperature</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-white/70">
-                            {prediction.temperature_2m?.toFixed(1) || "N/A"}°C
-                          </span>
+                        <div className="flex flex-col items-end">
                           <span className="font-bold text-white">
                             {prediction.scores.temperature}%
+                          </span>
+                          <span className="text-xs text-white/70">
+                            {prediction.temperature_2m?.toFixed(1) || "N/A"}°C
                           </span>
                         </div>
                       </div>
