@@ -164,30 +164,91 @@ export default function PredictionCard({
                   Factor Scores
                 </div>
 
-                {/* Primary Factors - Only showing scores used in calculation */}
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center justify-between">
-                        <span className="text-white/80">Cloud</span>
-                        <div className="flex items-center gap-2">
+                {/* Cloud Coverage Section */}
+                <div className="mb-2">
+                  <div className="mb-1 text-center text-xs font-medium text-white/90">
+                    Cloud Coverage
+                  </div>
+                  <div className="grid grid-cols-5 gap-x-2 text-xs">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex flex-col items-center">
+                          <span className="text-white/80">Low</span>
+                          <span className="text-xs text-white/70">
+                            {prediction.cloud_cover_low.toFixed(0)}%
+                          </span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Low Cloud Coverage</p>
+                        <p className="text-xs text-gray-300">
+                          Clouds below 2km altitude
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex flex-col items-center">
+                          <span className="text-white/80">Mid</span>
+                          <span className="text-xs text-white/70">
+                            {prediction.cloud_cover_mid.toFixed(0)}%
+                          </span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Mid Cloud Coverage</p>
+                        <p className="text-xs text-gray-300">
+                          Clouds between 2-6km altitude
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex flex-col items-center">
+                          <span className="text-white/80">High</span>
+                          <span className="text-xs text-white/70">
+                            {prediction.cloud_cover_high.toFixed(0)}%
+                          </span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>High Cloud Coverage</p>
+                        <p className="text-xs text-gray-300">
+                          Clouds above 6km altitude
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex flex-col items-center">
+                          <span className="text-white/80">Total</span>
                           <span className="text-xs text-white/70">
                             {prediction.cloud_cover.toFixed(0)}%
                           </span>
-                          <span className="font-bold text-white">
-                            {prediction.scores.cloudCoverage}%
-                          </span>
                         </div>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Cloud Coverage Score</p>
-                      <p className="text-xs text-gray-300">
-                        Based on total cloud cover (%)
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Total Cloud Coverage</p>
+                        <p className="text-xs text-gray-300">
+                          Total cloud cover (%)
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
 
+                    <div className="flex flex-col items-center">
+                      <span className="text-white/80">Score</span>
+                      <span className="font-bold text-white">
+                        {prediction.scores.cloudCoverage}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Primary Factors - Only showing scores used in calculation */}
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="flex items-center justify-between">
