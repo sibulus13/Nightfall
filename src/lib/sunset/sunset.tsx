@@ -600,25 +600,12 @@ function pressureScore(prediction: PredictionData) {
  */
 function particulateScore(prediction: PredictionData) {
   const pm2_5 = prediction.pm2_5;
-  const pm10 = prediction.pm10;
+  // const pm10 = prediction.pm10;
 
-  // Primary scoring based on PM2.5 levels
-  if (pm2_5 > 70) {
-    return 0.4; // Extremely high pollution - very poor conditions
-  }
-  if (pm2_5 > 55) {
-    return 0.6; // Very high pollution - poor conditions and health risks
-  }
-  if (pm2_5 > 35) {
-    return 0.85; // High pollution - reduced visibility despite potential color enhancement
-  }
-  if (pm2_5 > 15) {
-    return 1; // Moderate pollution - optimal sunset enhancement
-  }
-  if (pm2_5 > 5) {
-    return 0.85; // Good conditions - some enhancement without health risks
-  }
-  return 0.75; // Very clean air - may lack dramatic colors but excellent visibility
+  let pm2_5_score = 1 - Math.abs((pm2_5 - 45) / 45) ** 2;
+  pm2_5_score = Math.max(0.55, Math.min(1.01, pm2_5_score));
+
+  return pm2_5_score;
 }
 
 /**
