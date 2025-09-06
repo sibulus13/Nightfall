@@ -29,18 +29,13 @@ export default function CacheDebugger({ className }: CacheDebuggerProps) {
     }) => state.map,
   );
 
-  const mainPredictions = useSelector(
-    (state: { prediction: { prediction: unknown[] } }) =>
-      state.prediction.prediction,
-  );
-
   // Check predictions tab cache from localStorage
   useEffect(() => {
     const checkPredictionsCache = () => {
       try {
         const cached = localStorage.getItem("sunset-app-predictions-cache");
         if (cached) {
-          const parsedCache = JSON.parse(cached);
+          const parsedCache = JSON.parse(cached) as Record<string, unknown>;
           setPredictionsCacheSize(Object.keys(parsedCache).length);
         } else {
           setPredictionsCacheSize(0);
@@ -48,13 +43,13 @@ export default function CacheDebugger({ className }: CacheDebuggerProps) {
 
         // Calculate total localStorage usage
         let totalSize = 0;
-        for (let key in localStorage) {
+        for (const key in localStorage) {
           if (key.startsWith("sunset-app-")) {
-            totalSize += localStorage.getItem(key)?.length || 0;
+            totalSize += localStorage.getItem(key)?.length ?? 0;
           }
         }
         setLocalStorageSize(Math.round(totalSize / 1024)); // Convert to KB
-      } catch (error) {
+      } catch {
         setPredictionsCacheSize(0);
         setLocalStorageSize(0);
       }
@@ -96,7 +91,7 @@ export default function CacheDebugger({ className }: CacheDebuggerProps) {
   const handleClearAllCaches = () => {
     // Clear all sunset-app related localStorage
     const keysToRemove = [];
-    for (let key in localStorage) {
+    for (const key in localStorage) {
       if (key.startsWith("sunset-app-")) {
         keysToRemove.push(key);
       }

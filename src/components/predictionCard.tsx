@@ -1,18 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { type Prediction } from "~/lib/sunset/type";
-import {
-  Hourglass,
-  Eye,
-  Cloud,
-  Droplets,
-  Gauge,
-  ArrowLeft,
-  Wind,
-  Thermometer,
-  Zap,
-  Sun,
-} from "lucide-react";
+import { Hourglass, ArrowLeft } from "lucide-react";
 import { BsSunset } from "react-icons/bs";
 import { TbSunset2 } from "react-icons/tb";
 import {
@@ -47,16 +36,6 @@ export default function PredictionCard({
 
   const formatPressure = (pressure: number) => {
     return `${pressure.toFixed(0)} hPa`;
-  };
-
-  const getQualityColor = (value: number, thresholds: number[]) => {
-    if (thresholds.length >= 3 && value <= (thresholds[0] ?? 0))
-      return "text-green-600";
-    if (thresholds.length >= 3 && value <= (thresholds[1] ?? 0))
-      return "text-blue-600";
-    if (thresholds.length >= 3 && value <= (thresholds[2] ?? 0))
-      return "text-yellow-600";
-    return "text-orange-600";
   };
 
   const handleClick = () => {
