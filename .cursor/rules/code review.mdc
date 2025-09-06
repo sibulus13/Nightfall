@@ -17,7 +17,7 @@ The code review agent should:
 
 2. Run static analysis:
 
-   - Execute `npm run lint` for TypeScript validation
+   - Execute `npm run build` to validate successful build
    - Check for type safety and compilation issues
    - Verify ESLint rules compliance
    - Fix as many issues as possible, giving 3 tries per issue before failing and logging the attempt

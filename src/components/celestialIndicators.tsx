@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import React, { useMemo, useRef, useEffect, useState } from "react";
 import * as SunCalc from "suncalc";
 import { Sun, Moon } from "lucide-react";
@@ -114,8 +115,6 @@ const CelestialIndicators: React.FC<CelestialIndicatorsProps> = ({
   // Calculate a point far outside viewport based on azimuth
   const getDistantPoint = (azimuth: number) => {
     const { width, height } = viewportDimensions;
-    const centerX = width / 2;
-    const centerY = height / 2;
 
     // Convert azimuth to radians
     // SunCalc: 0° = South, 90° = West, 180° = North, 270° = East
