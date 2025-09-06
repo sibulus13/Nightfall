@@ -329,15 +329,12 @@ export default function AppPage() {
                       prediction={entry}
                       onMapClick={() => {
                         setActiveTab("map");
-                        // Set the selected day to match this prediction's date
-                        const predictionDate = new Date(
-                          entry.sunset_time, // Use timezone-aware date
-                        );
-
-                        // Use ISO date string format to match availableDates format
-                        const predictionDateOnly = predictionDate
-                          .toISOString()
-                          .split("T")[0];
+                        // Extract date part directly from sunset_time to avoid timezone issues
+                        const predictionDateOnly = entry.sunset_time.includes(
+                          "T",
+                        )
+                          ? entry.sunset_time.split("T")[0]
+                          : entry.sunset_time;
 
                         // Find the day index by comparing with available dates
                         const dayIndex = availableDates.findIndex(

@@ -862,23 +862,7 @@ function cloudCoverageScore(prediction: PredictionData) {
 
   // Ensure score stays within bounds
   score = Math.max(0.05, Math.min(1.0, score));
-  console.log(
-    "Cloud Coverage Scores:",
-    "Base:",
-    baseScore.toFixed(2),
-    "Low:",
-    lowCloudScore.toFixed(2),
-    "Mid:",
-    midCloudScore.toFixed(2),
-    "High:",
-    highCloudScore.toFixed(2),
-    "Interaction Bonus:",
-    interactionBonus.toFixed(2),
-    "Seasonal Adjustment:",
-    seasonalAdjustment.toFixed(2),
-    "Final Score:",
-    score.toFixed(2),
-  );
+  // Cloud coverage scoring completed
   return score;
 }
 

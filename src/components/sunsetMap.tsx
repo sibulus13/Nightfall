@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Play, Trash2, ChevronDown } from "lucide-react";
+import CelestialIndicators from "./celestialIndicators";
 
 interface SunsetMapProps {
   initialLocation?: {
@@ -59,17 +60,9 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   );
 
   // Use map data hook for date options and day selection
-  const { dateOptions, updateSelectedDay } = useMapData({
+  const { dateOptions, updateSelectedDay, availableDates } = useMapData({
     initialLocation,
   });
-
-  // Debug predictions state
-  useEffect(() => {
-    console.log("🔍 Current predictions state:", predictions);
-    console.log("🔍 Predictions count:", Object.keys(predictions).length);
-    console.log("🔍 Selected day index:", selectedDayIndex);
-    console.log("🔍 Available date options:", dateOptions);
-  }, [predictions, selectedDayIndex, dateOptions]);
 
   // Function to get gradient background based on prediction score (matching predictions tab)
   const getScoreGradient = useCallback((score: number) => {
@@ -89,9 +82,9 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       // Check if the prediction is for the currently selected day
       if (dateOptions.length > 0 && dateOptions[selectedDayIndex]) {
         const selectedDate = dateOptions[selectedDayIndex].dateString;
-        const predictionDate = new Date(prediction.sunset_time)
-          .toISOString()
-          .split("T")[0];
+        const predictionDate = prediction.sunset_time.includes("T")
+          ? prediction.sunset_time.split("T")[0]
+          : prediction.sunset_time;
 
         if (predictionDate === selectedDate) {
           return prediction; // Valid prediction for selected day
@@ -123,13 +116,34 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
           fetchBatchPredictions({
             markers: markersNeedingPredictions,
             dayIndex: selectedDayIndex,
+            availableDates: availableDates,
           }),
         );
       }
     }
-  }, [markers, selectedDayIndex, dispatch, markerNeedsPrediction]);
+  }, [
+    markers,
+    selectedDayIndex,
+    dispatch,
+    markerNeedsPrediction,
+    availableDates,
+  ]);
 
   // Note: Removed auto-refresh when day changes - predictions only generate on button click
+
+  // Get sunset time from any existing prediction for the selected day
+  const getSunsetTimeForSelectedDay = useCallback(() => {
+    if (markers.length === 0 || !dateOptions[selectedDayIndex])
+      return undefined;
+
+    // Get sunset time from the first marker's prediction for the selected day
+    const firstMarker = markers[0];
+    if (firstMarker) {
+      const prediction = getPredictionForSelectedDay(firstMarker.id);
+      return prediction?.sunset_time;
+    }
+    return undefined;
+  }, [markers, dateOptions, selectedDayIndex, getPredictionForSelectedDay]);
 
   // Update center when initialLocation changes
   useEffect(() => {
@@ -162,8 +176,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   // Handle map clicks to add/remove markers
   const handleMapClick = useCallback(
     (event: MapMouseEvent) => {
-      console.log("🗺️ Map clicked!", event);
-
       // Prevent default behavior and stop propagation
       if (event.domEvent) {
         event.domEvent.preventDefault();
@@ -171,7 +183,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       }
 
       if (!event.detail?.latLng) {
-        console.log("❌ No latLng in event detail");
         return;
       }
 
@@ -385,9 +396,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
                   key={marker.id}
                   position={{ lat: marker.lat, lng: marker.lng }}
                   onClick={() => {
-                    console.log(
-                      `🗑️ AdvancedMarker clicked for removal: ${marker.id}`,
-                    );
                     dispatch(removeMarker(marker.id));
                   }}
                 >
@@ -397,6 +405,15 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
             })}
           </Map>
         </APIProvider>
+
+        {/* Celestial Indicators */}
+        {center && dateOptions[selectedDayIndex] && (
+          <CelestialIndicators
+            center={center}
+            selectedDate={dateOptions[selectedDayIndex].dateString}
+            sunsetTime={getSunsetTimeForSelectedDay()}
+          />
+        )}
       </div>
     </div>
   );

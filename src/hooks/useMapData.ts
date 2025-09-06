@@ -76,9 +76,12 @@ export const useMapData = ({
 
                 // If we have a prediction, check if it's for the current selected day
                 if (prediction) {
-                    const predictionDate = new Date(prediction.sunset_time + "Z");
-                    const selectedDate = new Date(availableDates[selectedDayIndex] + "T00:00:00");
-                    const isSameDay = predictionDate.toDateString() === selectedDate.toDateString();
+                    // Extract date part from sunset_time to avoid timezone issues
+                    const predictionDateString = prediction.sunset_time.includes('T')
+                        ? prediction.sunset_time.split('T')[0]
+                        : prediction.sunset_time;
+                    const selectedDateString = availableDates[selectedDayIndex];
+                    const isSameDay = predictionDateString === selectedDateString;
                     return !isSameDay && !isLoading;
                 }
                 return !prediction && !isLoading;
@@ -89,6 +92,7 @@ export const useMapData = ({
                 void dispatch(fetchBatchPredictions({
                     markers: markersNeedingPredictions,
                     dayIndex: selectedDayIndex,
+                    availableDates: availableDates,
                 }));
             }
         }
@@ -126,7 +130,13 @@ export const useMapData = ({
         const today = new Date();
 
         return availableDates.map((dateString, index) => {
-            const date = new Date(dateString);
+            // Parse date as local time to avoid timezone shift
+            const [year, month, day] = dateString.split('-').map(Number);
+            if (year === undefined || month === undefined || day === undefined) {
+                throw new Error(`Invalid date format: ${dateString}`);
+            }
+            const date = new Date(year, month - 1, day); // month is 0-indexed
+
             const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
             const monthDay = date.toLocaleDateString("en-US", {
                 month: "short",

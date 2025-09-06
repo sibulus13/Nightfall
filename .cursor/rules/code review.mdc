@@ -1,0 +1,50 @@
+---
+description: Code Review
+globs:
+alwaysApply: false
+---
+
+The code review agent should:
+
+1. Analyze code changes for:
+
+   - Language-specific best practices (JavaScript/TypeScript)
+   - Framework conventions and patterns (React, Node.js, etc.)
+   - Proper API usage and integration patterns
+   - Security best practices and vulnerabilities
+   - Code complexity and maintainability
+   - Proper error handling patterns
+
+2. Run static analysis:
+
+   - Execute `npm run lint` for TypeScript validation
+   - Check for type safety and compilation issues
+   - Verify ESLint rules compliance
+   - Fix as many issues as possible, giving 3 tries per issue before failing and logging the attempt
+   - Run security scanning tools (e.g., npm audit)
+   - Check for unused dependencies and code
+
+3. Review logging:
+
+   - Ensure production logs are minimal and meaningful
+   - Remove debug statements
+   - Verify proper log levels (error, warn, info)
+   - Check for sensitive data in logs
+   - Validate log format consistency
+   - Ensure proper error stack traces
+
+4. Validate:
+   - Code formatting and style consistency
+   - Documentation completeness (JSDoc, README, etc.)
+   - Test coverage for new changes
+   - Performance implications
+   - Breaking changes and backward compatibility
+   - Proper version bumps in package.json
+   - Git commit message format
+   - Branch naming conventions
+
+5. Check dependencies:
+   - Review new package additions
+   - Verify license compatibility
+   - Check for known vulnerabilities
+   - Ensure proper version constraints

@@ -35,7 +35,15 @@ const isCacheValid = (cacheKey: string): boolean => {
 const ensureTodayFirst = (dates: string[]): string[] => {
   if (dates.length === 0) return dates;
 
-  const today = new Date().toISOString().split("T")[0];
+  // Get today's date in local timezone, not UTC
+  const now = new Date();
+  const today =
+    now.getFullYear() +
+    "-" +
+    String(now.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(now.getDate()).padStart(2, "0");
+
   const todayIndex = dates.findIndex((date) => date === today);
 
   if (todayIndex === -1) {
@@ -48,6 +56,9 @@ const ensureTodayFirst = (dates: string[]): string[] => {
     // Move today to the beginning
     const newDates = [...dates];
     const [todayDate] = newDates.splice(todayIndex, 1);
+    if (todayDate === undefined) {
+      throw new Error("Failed to extract today date from array");
+    }
     return [todayDate, ...newDates];
   }
 };
@@ -197,18 +208,27 @@ export const fetchAvailableDates = createAsyncThunk(
         // Extract dates from the cached predictions
         const dates = cachedData
           .map((pred) => {
-            const date = new Date(pred.sunset_time); // Use timezone-aware date
-            return date.toISOString().split("T")[0];
+            // Extract just the date part from sunset_time to avoid timezone issues
+            const sunsetTime = pred.sunset_time;
+            if (sunsetTime.includes("T")) {
+              // If it's a full datetime, extract just the date part
+              return sunsetTime.split("T")[0];
+            } else {
+              // If it's just a date string, use it directly
+              return sunsetTime;
+            }
           })
           .filter((date): date is string => date !== undefined);
 
         // Ensure today is first in the list
-        return ensureTodayFirst(dates);
+        return ensureTodayFirst(
+          dates.filter((date): date is string => date !== undefined),
+        );
       }
     }
 
-    // Fetch new data if not cached
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset,daylight_duration,sunshine_duration`;
+    // Fetch new data if not cached - limit to 6 days to match predictions
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=weather_code,relative_humidity_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset,daylight_duration,sunshine_duration&forecast_days=6`;
     const res = await fetch(url);
 
     // Check for rate limit error
@@ -221,17 +241,34 @@ export const fetchAvailableDates = createAsyncThunk(
     }
 
     const forecast = (await res.json()) as { daily?: { time?: string[] } };
-    const dates = forecast.daily?.time ?? [];
+    const rawDates = forecast.daily?.time ?? [];
+
+    // Convert dates to consistent ISO format to match cached data format
+    const dates = rawDates.map((dateString) => {
+      // Ensure the date is treated as local date, not UTC
+      const date = new Date(dateString + "T00:00:00");
+      return date.toISOString().split("T")[0];
+    });
 
     // Ensure today is first in the list
-    return ensureTodayFirst(dates);
+    return ensureTodayFirst(
+      dates.filter((date): date is string => date !== undefined),
+    );
   },
 );
 
 // Batch fetch predictions for multiple markers
 export const fetchBatchPredictions = createAsyncThunk(
   "map/fetchBatchPredictions",
-  async ({ markers, dayIndex }: { markers: MapMarker[]; dayIndex: number }) => {
+  async ({
+    markers,
+    dayIndex,
+    availableDates,
+  }: {
+    markers: MapMarker[];
+    dayIndex: number;
+    availableDates: string[];
+  }) => {
     const results = await Promise.allSettled(
       markers.map(async (marker) => {
         const cacheKey = createCacheKey(marker.lat, marker.lng);
@@ -240,9 +277,18 @@ export const fetchBatchPredictions = createAsyncThunk(
         if (isCacheValid(cacheKey)) {
           const cachedData = apiCache[cacheKey]?.data;
           if (cachedData) {
+            // Find the prediction that matches the selected date
+            const selectedDate = availableDates[dayIndex];
+            const matchingPrediction = cachedData.find((pred) => {
+              const predDate = pred.sunset_time.includes("T")
+                ? pred.sunset_time.split("T")[0]
+                : pred.sunset_time;
+              return predDate === selectedDate;
+            });
+
             return {
               markerId: marker.id,
-              prediction: cachedData[dayIndex] ?? null,
+              prediction: matchingPrediction ?? null,
               fromCache: true,
             };
           }
@@ -264,9 +310,18 @@ export const fetchBatchPredictions = createAsyncThunk(
             };
           }
 
+          // Find the prediction that matches the selected date
+          const selectedDate = availableDates[dayIndex];
+          const matchingPrediction = predictionResults?.find((pred) => {
+            const predDate = pred.sunset_time.includes("T")
+              ? pred.sunset_time.split("T")[0]
+              : pred.sunset_time;
+            return predDate === selectedDate;
+          });
+
           return {
             markerId: marker.id,
-            prediction: predictionResults?.[dayIndex] ?? null,
+            prediction: matchingPrediction ?? null,
             fromCache: false,
           };
         } catch (error) {
@@ -452,22 +507,11 @@ export const mapSlice = createSlice({
       })
       // Handle batch predictions
       .addCase(fetchBatchPredictions.pending, (state) => {
-        console.log(
-          "⏳ fetchBatchPredictions.pending - Setting isCalculating to true",
-        );
         state.isCalculating = true;
       })
       .addCase(fetchBatchPredictions.fulfilled, (state, action) => {
-        console.log(
-          "🎉 fetchBatchPredictions.fulfilled - Processing results:",
-          action.payload,
-        );
         action.payload.forEach((result) => {
           if (result.prediction !== undefined && "markerId" in result) {
-            console.log(
-              `📊 Setting prediction for marker ${result.markerId}:`,
-              result.prediction,
-            );
             state.predictions[result.markerId] = result.prediction;
             state.loadingStates[result.markerId] = false;
 
@@ -476,8 +520,6 @@ export const mapSlice = createSlice({
                 state.cachedLocations.push(result.markerId);
               }
             }
-          } else {
-            console.log(`⚠️ No prediction data for marker`, result);
           }
         });
         state.isCalculating = false;
