@@ -531,77 +531,29 @@ function pressureScore(prediction: PredictionData) {
 /**
  * Calculate particulate matter impact on sunset quality
  *
- * Particulate matter (PM2.5 and PM10) has a complex relationship with sunset quality
- * that involves the "pollution paradox" - some air pollution can actually enhance
- * sunset colors while reducing overall visibility and air quality:
+ * Particulate matter (PM2.5 and PM10) affects sunset quality through the "pollution paradox":
+ * - Moderate PM2.5 levels can enhance sunset colors through light scattering
+ * - High levels reduce visibility and overall quality
+ * - Very low levels may lack dramatic colors
  *
- * 1. Light Scattering Enhancement:
- *    - Fine particles (PM2.5) scatter sunlight more effectively than larger particles
- *    - This scattering can create more dramatic red/orange colors during sunset
- *    - The effect is most pronounced when particles are in the optimal size range
+ * Key effects:
+ * - PM2.5 (≤2.5 μm): Scatters blue light, enhancing red/orange hues
+ * - PM10 (≤10 μm): Can block light and reduce visibility
+ * - Optimal enhancement occurs with moderate PM2.5 levels
  *
- * 2. Pollution Paradox:
- *    - Moderate pollution levels (10-35 μg/m³ PM2.5) can enhance sunset colors
- *    - High pollution levels (>35 μg/m³ PM2.5) typically reduce visibility too much
- *    - Very low pollution (<5 μg/m³ PM2.5) may lack the scattering needed for dramatic colors
+ * Thresholds:
+ * - PM2.5 <5 μg/m³: Very clean, minimal color enhancement
+ * - PM2.5 5-15 μg/m³: Good balance of enhancement and air quality
+ * - PM2.5 15-35 μg/m³: Peak color enhancement
+ * - PM2.5 >35 μg/m³: Reduced visibility outweighs color benefits
  *
- * 3. Particle Size Effects:
- *    - PM2.5 (≤2.5 μm): Most effective at scattering blue light, enhancing red/orange hues
- *    - PM10 (≤10 μm): Larger particles that can block more light and reduce visibility
- *    - Optimal sunset enhancement occurs with moderate PM2.5 levels
- *
- * 4. Geographic and Seasonal Variations:
- *    - Urban areas often have higher baseline pollution but spectacular sunsets
- *    - Wildfire smoke can create dramatic sunset effects but poor air quality
- *    - Industrial pollution patterns vary by region and season
- *
- * 5. Health vs. Aesthetic Considerations:
- *    - While pollution can enhance sunset colors, it's harmful to health
- *    - The scoring balances aesthetic appeal with air quality concerns
- *    - Very high pollution levels are penalized despite potential color enhancement
- *
- * TODO: Particulate improvements:
- * - Aerosol optical depth, particle size distribution
- * - Composition analysis, source identification
- * - Temporal/spatial patterns, vertical profile
- * - Aging/hygroscopic/coagulation effects
- * - Deposition/transport/transformation effects
- * - Chemical composition, optical properties
- * - Radiative effects, cloud/precipitation interactions
- * - Wind/temperature/humidity/pressure effects
- * - Visibility/color effects, health/environmental impact
- * - Regulatory compliance, forecasting, historical trends
- *
- * Threshold Analysis:
- * - PM2.5 <5 μg/m³: Very clean air, may lack dramatic colors
- * - PM2.5 5-15 μg/m³: Good conditions, some enhancement without health risks
- * - PM2.5 15-35 μg/m³: Moderate pollution, optimal sunset enhancement
- * - PM2.5 35-55 μg/m³: High pollution, reduced visibility despite color enhancement
- * - PM2.5 >55 μg/m³: Very high pollution, poor conditions and health risks
- *
- * Current limitations:
- * - Uses PM2.5/PM10 instead of more precise aerosol optical depth
- * - No consideration of particle composition or source
- * - No integration with particle size distribution
- * - Simplified threshold approach may not capture complex interactions
- * - No seasonal or geographic adjustments
- * - No consideration of particle quality or uniformity
- * - No integration with other atmospheric factors
- *
- * Scientific Basis:
- * The relationship between particulate matter and sunset quality is supported by
- * atmospheric science research on light scattering and the well-documented
- * "pollution paradox" observed in urban areas worldwide.
- *
- * Note: This scoring balances aesthetic appeal with air quality concerns,
- * recognizing that while some pollution can enhance sunset colors, excessive
- * pollution is detrimental to both health and overall viewing experience.
+ * Note: Scoring balances aesthetic enhancement with air quality concerns.
  */
 function particulateScore(prediction: PredictionData) {
   const pm2_5 = prediction.pm2_5;
   // const pm10 = prediction.pm10;
 
-  let pm2_5_score = 1 - Math.abs((pm2_5 - 45) / 45) ** 2;
+  let pm2_5_score = 1 - Math.abs((pm2_5 - 35) / 35);
   pm2_5_score = Math.max(0.55, Math.min(1.01, pm2_5_score));
 
   return pm2_5_score;
