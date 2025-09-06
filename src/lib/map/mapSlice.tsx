@@ -31,6 +31,27 @@ const isCacheValid = (cacheKey: string): boolean => {
   return !!(cached && Date.now() < cached.expiresAt);
 };
 
+// Helper function to ensure today is first in the dates array
+const ensureTodayFirst = (dates: string[]): string[] => {
+  if (dates.length === 0) return dates;
+
+  const today = new Date().toISOString().split("T")[0];
+  const todayIndex = dates.findIndex((date) => date === today);
+
+  if (todayIndex === -1) {
+    // Today is not in the list, add it at the beginning
+    return [today, ...dates];
+  } else if (todayIndex === 0) {
+    // Today is already first
+    return dates;
+  } else {
+    // Move today to the beginning
+    const newDates = [...dates];
+    const [todayDate] = newDates.splice(todayIndex, 1);
+    return [todayDate, ...newDates];
+  }
+};
+
 interface MapState {
   markers: MapMarker[];
   predictions: Record<string, Prediction | null>;
@@ -180,7 +201,9 @@ export const fetchAvailableDates = createAsyncThunk(
             return date.toISOString().split("T")[0];
           })
           .filter((date): date is string => date !== undefined);
-        return dates;
+
+        // Ensure today is first in the list
+        return ensureTodayFirst(dates);
       }
     }
 
@@ -200,7 +223,8 @@ export const fetchAvailableDates = createAsyncThunk(
     const forecast = (await res.json()) as { daily?: { time?: string[] } };
     const dates = forecast.daily?.time ?? [];
 
-    return dates;
+    // Ensure today is first in the list
+    return ensureTodayFirst(dates);
   },
 );
 

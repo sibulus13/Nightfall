@@ -334,19 +334,19 @@ export default function AppPage() {
                           entry.sunset_time, // Use timezone-aware date
                         );
 
-                        // Use date-only comparison to match map view logic
-                        const predictionDateOnly =
-                          predictionDate.toDateString();
+                        // Use ISO date string format to match availableDates format
+                        const predictionDateOnly = predictionDate
+                          .toISOString()
+                          .split("T")[0];
 
                         // Find the day index by comparing with available dates
                         const dayIndex = availableDates.findIndex(
                           (dateString: string) => {
-                            const date = new Date(dateString + "T00:00:00");
-                            return date.toDateString() === predictionDateOnly;
+                            return dateString === predictionDateOnly;
                           },
                         );
 
-                        if (dayIndex >= 0 && dayIndex < 6) {
+                        if (dayIndex >= 0) {
                           dispatch({
                             type: "map/setSelectedDayIndex",
                             payload: dayIndex,
