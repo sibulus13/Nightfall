@@ -2,7 +2,6 @@ import { useEffect, useCallback, useMemo } from "react";
 import { useSelector } from "react-redux";
 
 import {
-    setMarkers,
     setCurrentLocation,
     fetchAvailableDates,
     fetchBatchPredictions,
@@ -16,15 +15,11 @@ import { areCoordinatesEqual } from "~/lib/utils";
 
 interface UseMapDataProps {
     initialLocation?: { lat: number; lng: number };
-    gridRows?: number;
-    gridColumns?: number;
     topScorePercentage?: number;
 }
 
 export const useMapData = ({
     initialLocation,
-    gridRows = 5,
-    gridColumns = 5,
     topScorePercentage = 20,
 }: UseMapDataProps) => {
     const dispatch = useDispatch<AppDispatch>();
@@ -57,62 +52,28 @@ export const useMapData = ({
         }
     }, [initialLocation, currentLocation, dispatch, isRateLimited]);
 
-    // Generate grid markers when bounds change
-    const generateMarkers = useCallback((bounds: {
-        north: number;
-        south: number;
-        east: number;
-        west: number;
-    }, zoom?: number) => {
-        if (!bounds) return;
-
-        // Use consistent grid size regardless of zoom level
-        const adjustedGridRows = gridRows;
-        const adjustedGridColumns = gridColumns;
-
-        // Add padding to create some space from the edges
-        const padding = 0.15;
-        const latPadding = (bounds.north - bounds.south) * padding;
-        const lngPadding = (bounds.east - bounds.west) * padding;
-
-        const paddedNorth = bounds.north - latPadding;
-        const paddedSouth = bounds.south + latPadding;
-        const paddedEast = bounds.east - lngPadding;
-        const paddedWest = bounds.west + lngPadding;
-
-        const latStep = (paddedNorth - paddedSouth) / (adjustedGridRows - 1);
-        const lngStep = (paddedEast - paddedWest) / (adjustedGridColumns - 1);
-
-        const newMarkers: Array<{ lat: number; lng: number; id: string }> = [];
-
-        for (let row = 0; row < adjustedGridRows; row++) {
-            // Stagger each row by offsetting the longitude
-            const rowOffset = ((row + 1) % 2) * (lngStep * 0.5);
-
-            for (let col = 0; col < adjustedGridColumns; col++) {
-                const lat = paddedSouth + latStep * row;
-                const lng = paddedWest + lngStep * col + rowOffset;
-
-                newMarkers.push({
-                    lat,
-                    lng,
-                    id: `marker-${row}-${col}`,
-                });
+    // Fetch available dates when we have markers but no dates yet
+    useEffect(() => {
+        if (markers.length > 0 && availableDates.length === 0 && !isRateLimited) {
+            // Use the first marker's location to fetch available dates
+            const firstMarker = markers[0];
+            if (firstMarker) {
+                void dispatch(fetchAvailableDates({
+                    lat: firstMarker.lat,
+                    lng: firstMarker.lng,
+                }));
             }
         }
+    }, [markers, availableDates, dispatch, isRateLimited]);
 
-        // Clear existing predictions when generating new markers to force recalculation
-        dispatch(setMarkers(newMarkers));
-    }, [gridRows, gridColumns, dispatch]);
 
-    // Single useEffect to handle all prediction fetching with batching
-    useEffect(() => {
+    // Manual prediction fetching - only when explicitly called
+    const fetchPredictionsForMarkers = useCallback(() => {
         if (markers.length > 0 && availableDates.length > 0 && !isRateLimited) {
-            // When selectedDayIndex changes, we need to refetch all predictions
-            // When markers change, we only fetch for new markers
             const markersNeedingPredictions = markers.filter(marker => {
                 const prediction = predictions[marker.id];
                 const isLoading = loadingStates[marker.id];
+
                 // If we have a prediction, check if it's for the current selected day
                 if (prediction) {
                     const predictionDate = new Date(prediction.sunset_time + "Z");
@@ -208,7 +169,7 @@ export const useMapData = ({
         rateLimitMessage,
         visibleMarkers,
         dateOptions,
-        generateMarkers,
+        fetchPredictionsForMarkers,
         updateSelectedDay,
         clearMapData,
         clearRateLimit: clearRateLimitHandler,

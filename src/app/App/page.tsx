@@ -11,7 +11,7 @@ import PredictionCard from "~/components/predictionCard";
 import { useSelector } from "react-redux";
 import usePrediction from "~/hooks/usePrediction";
 import { useMapData } from "~/hooks/useMapData";
-import { clearRateLimit } from "~/lib/map/mapSlice";
+import { clearRateLimit, hydrateFromLocalStorage } from "~/lib/map/mapSlice";
 import { useDispatch } from "react-redux";
 import { areCoordinatesEqual } from "~/lib/utils";
 import CacheDebugger from "~/components/CacheDebugger";
@@ -75,7 +75,7 @@ export default function AppPage() {
   const { predict } = usePrediction();
   const dispatch = useDispatch();
   const [currentLocation, setCurrentLocation] = useState({ lat: 0, lng: 0 });
-  const [activeTab, setActiveTab] = useState("predictions");
+  const [activeTab, setActiveTab] = useState("predictions"); // Default to predictions tab
   const [isInitialized, setIsInitialized] = useState(false);
   const [locationName, setLocationName] = useState<string>("");
   const mapLocationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -113,6 +113,13 @@ export default function AppPage() {
       };
     }) => state.map,
   );
+
+  // Hydrate state from localStorage on client-side mount
+  useEffect(() => {
+    dispatch(hydrateFromLocalStorage());
+  }, [dispatch]);
+
+  // Note: Removed auto-switching to map tab - user stays on predictions tab by default
 
   async function setPlace(place: google.maps.places.PlaceResult | null) {
     const lat = place?.geometry?.location?.lat();
@@ -165,7 +172,7 @@ export default function AppPage() {
     }
   }
 
-  // Handle location changes from the map (debounced to avoid too many API calls)
+  // Handle location changes from the map (no automatic predictions)
   const handleMapLocationChange = useCallback(
     (location: { lat: number; lng: number }) => {
       // Check if this is the same location to avoid unnecessary API calls
@@ -180,18 +187,15 @@ export default function AppPage() {
         clearTimeout(mapLocationTimeoutRef.current);
       }
 
-      // Debounce the API calls to avoid too many requests while dragging
+      // Debounce getting the location name only (no predictions)
       mapLocationTimeoutRef.current = setTimeout(() => {
         // Get location name from coordinates
         void getLocationName(location.lat, location.lng).then((name) => {
           if (name) setLocationName(name);
         });
-
-        // Fetch predictions for the new location
-        void predict({ lat: location.lat, lon: location.lng });
-      }, 5000); // 5 second debounce
+      }, 1000); // Reduced debounce since we're only getting location name
     },
-    [currentLocation, predict],
+    [currentLocation],
   );
 
   useEffect(() => {
@@ -342,7 +346,7 @@ export default function AppPage() {
                           },
                         );
 
-                        if (dayIndex >= 0 && dayIndex < 7) {
+                        if (dayIndex >= 0 && dayIndex < 6) {
                           dispatch({
                             type: "map/setSelectedDayIndex",
                             payload: dayIndex,

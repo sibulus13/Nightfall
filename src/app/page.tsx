@@ -1,7 +1,7 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { CiSaveDown1 } from "react-icons/ci";
 import { GrScorecard } from "react-icons/gr";
 import { FcGlobe } from "react-icons/fc";
@@ -9,11 +9,33 @@ import { FcOldTimeCamera } from "react-icons/fc";
 import { scrollIntoTheView } from "~/lib/document";
 import Locator from "~/components/locator";
 import usePrediction from "~/hooks/usePrediction";
+import { hydrateFromLocalStorage } from "~/lib/map/mapSlice";
 
 export default function MainPage() {
   const Router = useRouter();
   const dispatch = useDispatch();
   const { predict } = usePrediction();
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Get markers from Redux store
+  const markers = useSelector(
+    (state: {
+      map: { markers: Array<{ lat: number; lng: number; id: string }> };
+    }) => state.map.markers,
+  );
+
+  // Hydrate state from localStorage on client-side mount
+  useEffect(() => {
+    dispatch(hydrateFromLocalStorage());
+    setIsHydrated(true);
+  }, [dispatch]);
+
+  // Check if user has existing markers and redirect to App page (only after hydration)
+  useEffect(() => {
+    if (isHydrated && markers.length > 0) {
+      Router.push("/App");
+    }
+  }, [isHydrated, markers, Router]);
 
   function toAppPage() {
     Router.push("/App");

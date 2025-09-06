@@ -45,7 +45,31 @@ interface MapState {
   cachedLocations: string[];
 }
 
-const initialState: MapState = {
+// Helper functions for localStorage
+const saveToLocalStorage = (key: string, data: unknown) => {
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+  } catch (error) {
+    console.error("Error saving to localStorage:", error);
+  }
+};
+
+const loadFromLocalStorage = (key: string): unknown => {
+  try {
+    if (typeof window !== "undefined") {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : null;
+    }
+  } catch (error) {
+    console.error("Error loading from localStorage:", error);
+  }
+  return null;
+};
+
+// Default initial state (used for SSR)
+const getDefaultInitialState = (): MapState => ({
   markers: [],
   predictions: {},
   loadingStates: {},
@@ -56,7 +80,42 @@ const initialState: MapState = {
   isRateLimited: false,
   rateLimitMessage: "",
   cachedLocations: [],
+});
+
+// Load initial state from localStorage (client-side only)
+const loadInitialState = (): MapState => {
+  // During SSR, return default state to prevent hydration mismatch
+  if (typeof window === "undefined") {
+    return getDefaultInitialState();
+  }
+
+  const savedMarkers =
+    (loadFromLocalStorage("sunset-app-markers") as MapMarker[]) || [];
+  const savedLocation = loadFromLocalStorage("sunset-app-last-location") as {
+    lat: number;
+    lng: number;
+  } | null;
+  const savedPredictions =
+    (loadFromLocalStorage("sunset-app-predictions") as Record<
+      string,
+      Prediction | null
+    >) || {};
+
+  return {
+    markers: savedMarkers,
+    predictions: savedPredictions,
+    loadingStates: {},
+    isCalculating: false,
+    availableDates: [],
+    selectedDayIndex: 0,
+    currentLocation: savedLocation,
+    isRateLimited: false,
+    rateLimitMessage: "",
+    cachedLocations: [],
+  };
 };
+
+const initialState: MapState = loadInitialState();
 
 // Async thunk to fetch predictions for a marker with caching
 export const fetchMarkerPrediction = createAsyncThunk(
@@ -166,25 +225,33 @@ export const fetchBatchPredictions = createAsyncThunk(
         }
 
         // Fetch new data
-        const predictionResults = await getSunsetPrediction(
-          marker.lat,
-          marker.lng,
-        );
+        try {
+          const predictionResults = await getSunsetPrediction(
+            marker.lat,
+            marker.lng,
+          );
 
-        // Cache the results
-        if (predictionResults) {
-          apiCache[cacheKey] = {
-            data: predictionResults,
-            timestamp: Date.now(),
-            expiresAt: Date.now() + CACHE_DURATION,
+          // Cache the results
+          if (predictionResults) {
+            apiCache[cacheKey] = {
+              data: predictionResults,
+              timestamp: Date.now(),
+              expiresAt: Date.now() + CACHE_DURATION,
+            };
+          }
+
+          return {
+            markerId: marker.id,
+            prediction: predictionResults?.[dayIndex] ?? null,
+            fromCache: false,
           };
+        } catch (error) {
+          console.error(
+            `❌ Error fetching prediction for marker ${marker.id}:`,
+            error,
+          );
+          throw error;
         }
-
-        return {
-          markerId: marker.id,
-          prediction: predictionResults?.[dayIndex] ?? null,
-          fromCache: false,
-        };
       }),
     );
 
@@ -192,6 +259,10 @@ export const fetchBatchPredictions = createAsyncThunk(
       if (result.status === "fulfilled") {
         return result.value;
       } else {
+        console.error(
+          `❌ Marker ${index + 1} prediction rejected:`,
+          result.reason,
+        );
         return {
           markerId: markers[index]?.id ?? "",
           prediction: null,
@@ -209,10 +280,45 @@ export const mapSlice = createSlice({
   reducers: {
     setMarkers: (state, action: { payload: MapMarker[] }) => {
       state.markers = action.payload;
-      // Clear predictions and loading states when markers change to force recalculation
+      // Clear predictions and loading states when markers change
       state.predictions = {};
       state.loadingStates = {};
       state.isCalculating = false;
+    },
+    addMarker: (state, action: { payload: { lat: number; lng: number } }) => {
+      // Only add if we have less than 5 markers
+      if (state.markers.length < 5) {
+        const newMarker: MapMarker = {
+          lat: action.payload.lat,
+          lng: action.payload.lng,
+          id: `marker-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        };
+        state.markers.push(newMarker);
+
+        // Save to localStorage
+        saveToLocalStorage("sunset-app-markers", state.markers);
+      }
+    },
+    removeMarker: (state, action: { payload: string }) => {
+      const markerId = action.payload;
+      state.markers = state.markers.filter((marker) => marker.id !== markerId);
+      // Clean up associated data
+      delete state.predictions[markerId];
+      delete state.loadingStates[markerId];
+
+      // Save to localStorage
+      saveToLocalStorage("sunset-app-markers", state.markers);
+      saveToLocalStorage("sunset-app-predictions", state.predictions);
+    },
+    clearAllMarkers: (state) => {
+      state.markers = [];
+      state.predictions = {};
+      state.loadingStates = {};
+      state.isCalculating = false;
+
+      // Clear from localStorage
+      saveToLocalStorage("sunset-app-markers", []);
+      saveToLocalStorage("sunset-app-predictions", {});
     },
     setSelectedDayIndex: (state, action: { payload: number }) => {
       state.selectedDayIndex = action.payload;
@@ -222,6 +328,9 @@ export const mapSlice = createSlice({
       action: { payload: { lat: number; lng: number } },
     ) => {
       state.currentLocation = action.payload;
+
+      // Save to localStorage
+      saveToLocalStorage("sunset-app-last-location", action.payload);
     },
     resetMap: (state) => {
       state.markers = [];
@@ -243,6 +352,28 @@ export const mapSlice = createSlice({
     clearCache: (state) => {
       Object.keys(apiCache).forEach((key) => delete apiCache[key]);
       state.cachedLocations = [];
+    },
+    // Hydrate state from localStorage after client-side mount
+    hydrateFromLocalStorage: (state) => {
+      if (typeof window !== "undefined") {
+        const savedMarkers =
+          (loadFromLocalStorage("sunset-app-markers") as MapMarker[]) || [];
+        const savedLocation = loadFromLocalStorage(
+          "sunset-app-last-location",
+        ) as {
+          lat: number;
+          lng: number;
+        } | null;
+        const savedPredictions =
+          (loadFromLocalStorage("sunset-app-predictions") as Record<
+            string,
+            Prediction | null
+          >) || {};
+
+        state.markers = savedMarkers;
+        state.currentLocation = savedLocation;
+        state.predictions = savedPredictions;
+      }
     },
   },
   extraReducers: (builder) => {
@@ -297,11 +428,22 @@ export const mapSlice = createSlice({
       })
       // Handle batch predictions
       .addCase(fetchBatchPredictions.pending, (state) => {
+        console.log(
+          "⏳ fetchBatchPredictions.pending - Setting isCalculating to true",
+        );
         state.isCalculating = true;
       })
       .addCase(fetchBatchPredictions.fulfilled, (state, action) => {
+        console.log(
+          "🎉 fetchBatchPredictions.fulfilled - Processing results:",
+          action.payload,
+        );
         action.payload.forEach((result) => {
-          if (result.prediction !== undefined) {
+          if (result.prediction !== undefined && "markerId" in result) {
+            console.log(
+              `📊 Setting prediction for marker ${result.markerId}:`,
+              result.prediction,
+            );
             state.predictions[result.markerId] = result.prediction;
             state.loadingStates[result.markerId] = false;
 
@@ -310,11 +452,17 @@ export const mapSlice = createSlice({
                 state.cachedLocations.push(result.markerId);
               }
             }
+          } else {
+            console.log(`⚠️ No prediction data for marker`, result);
           }
         });
         state.isCalculating = false;
+
+        // Save predictions to localStorage
+        saveToLocalStorage("sunset-app-predictions", state.predictions);
       })
       .addCase(fetchBatchPredictions.rejected, (state, action) => {
+        console.error("❌ fetchBatchPredictions.rejected:", action.error);
         state.isCalculating = false;
         if (action.error.message?.includes("429")) {
           state.isRateLimited = true;
@@ -342,11 +490,15 @@ export const mapSlice = createSlice({
 
 export const {
   setMarkers,
+  addMarker,
+  removeMarker,
+  clearAllMarkers,
   setSelectedDayIndex,
   setCurrentLocation,
   resetMap,
   clearRateLimit,
   clearCache,
+  hydrateFromLocalStorage,
 } = mapSlice.actions;
 
 export default mapSlice.reducer;
