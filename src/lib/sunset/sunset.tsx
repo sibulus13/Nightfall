@@ -728,89 +728,35 @@ function visibilityScore(prediction: PredictionData) {
  */
 function cloudCoverageScore(prediction: PredictionData) {
   let score = 1.0;
-
-  // Extract cloud coverage values
-  const totalCover = prediction.cloud_cover;
+  // const totalCover = prediction.cloud_cover;
   const lowCover = prediction.cloud_cover_low;
   const midCover = prediction.cloud_cover_mid;
   const highCover = prediction.cloud_cover_high;
 
-  // 1. BASE SCORE: Total cloud coverage using research-based bell curve
-  // Research shows optimal total coverage is 35-45% for sunset enhancement
-  // Too little (<15%) lacks dramatic elements, too much (>80%) blocks light
-  let baseScore = 1.0;
-  if (totalCover < 15 || totalCover > 80) {
-    // Severe penalty for extreme values
-    baseScore = 0.3;
-  } else if (totalCover >= 35 && totalCover <= 45) {
-    // Optimal range gets full score
-    baseScore = 1.0;
-  } else {
-    // Bell curve calculation: optimal at 40%, decreasing as we move away
-    const optimalCover = 40;
-    const deviation = Math.abs(totalCover - optimalCover);
-    const maxDeviation = 25; // Maximum deviation before severe penalty
-    baseScore = Math.max(0.4, 1.0 - (deviation / maxDeviation) ** 2);
+  let lowScore = 1.0,
+    midScore = 1.0,
+    highScore = 1.0;
+
+  if (lowCover > 40) {
+    lowScore = Math.max(0.3, 1 - (lowCover / 100) ** 2);
   }
 
-  // 2. HEIGHT-BASED SCORING: Different penalties for different cloud heights
-  // Based on research showing high clouds enhance, low clouds degrade sunset quality
-
-  // Low cloud penalty (inverse relationship - more low clouds = worse)
-  // Research: Low clouds reduce sunset intensity by 70-90% at high coverage
-  let lowCloudScore = 1.0;
-  if (lowCover > 60) {
-    // Severe penalty for high low cloud coverage
-    lowCloudScore = 0.2;
-  } else if (lowCover > 40) {
-    // Moderate penalty
-    lowCloudScore = 0.5;
-  } else if (lowCover > 20) {
-    // Light penalty
-    lowCloudScore = 0.8;
-  } else {
-    // Optimal low cloud coverage (10-20%)
-    const deviation = Math.abs(lowCover - 15);
-    lowCloudScore = Math.max(0.9, 1.0 - deviation / 20);
+  if (midCover <= 10) {
+    midScore = 0.7;
   }
 
-  // Mid cloud scoring (bell curve - some mid clouds are good)
-  // Research: Optimal mid cloud coverage is 20-35% for enhancement
-  let midCloudScore = 1.0;
-  if (midCover > 60) {
-    // Too much mid cloud coverage
-    midCloudScore = 0.6;
-  } else if (midCover >= 20 && midCover <= 35) {
-    // Optimal range
-    midCloudScore = 1.0;
-  } else {
-    // Bell curve around optimal 27.5%
-    const optimalMid = 27.5;
-    const deviation = Math.abs(midCover - optimalMid);
-    midCloudScore = Math.max(0.7, 1.0 - (deviation / 40) ** 2);
+  if (midCover > 40) {
+    midScore = 1 - (midCover / 100) ** 2 + 0.1;
   }
 
-  // High cloud scoring (positive relationship - more high clouds = better, to a point)
-  // Research: High clouds enhance sunset colors through Rayleigh scattering
-  let highCloudScore = 1.0;
-  if (highCover > 80) {
-    // Too much high cloud coverage can block light
-    highCloudScore = 0.6;
-  } else if (highCover >= 60 && highCover <= 80) {
-    // Suboptimal but still decent range
-    highCloudScore = 0.8;
-  } else if (highCover >= 40 && highCover <= 60) {
-    // Optimal range for dramatic effects
-    highCloudScore = 1.0;
-  } else if (highCover < 20) {
-    // Some high clouds are better than none
-    highCloudScore = 0.5;
-  } else if (highCover < 40) {
-    // Good range
-    highCloudScore = 0.8;
+  if (highCover <= 10) {
+    highScore = 0.7;
   }
 
-  // 3. INTERACTION BONUS: Reward optimal combinations
+  if (highCover > 40) {
+    highScore = 1 - (highCover / 100) ** 2 + 0.1;
+  }
+
   // Research shows certain cloud combinations create spectacular effects
   let interactionBonus = 1.0;
 
@@ -828,41 +774,16 @@ function cloudCoverageScore(prediction: PredictionData) {
   if (highCover > 30 && midCover > 20 && lowCover < 25) {
     interactionBonus *= 1.05;
   }
+  score = lowScore * midScore * highScore * interactionBonus;
 
-  // 4. SEASONAL ADJUSTMENT: Account for seasonal variations
-  // Research shows different optimal conditions by season
-  let seasonalAdjustment = 1.0;
-  const date = new Date(prediction.sunset);
-  const month = date.getMonth() + 1; // 1-12
-
-  if (month >= 3 && month <= 5) {
-    // Spring: Slightly higher tolerance for clouds (more dramatic spring sunsets)
-    seasonalAdjustment = 1.05;
-  } else if (month >= 9 && month <= 11) {
-    // Fall: Optimal conditions, no adjustment needed
-    seasonalAdjustment = 1.0;
-  } else if (month >= 6 && month <= 8) {
-    // Summer: Slightly lower tolerance (hazy conditions)
-    seasonalAdjustment = 0.95;
-  } else {
-    // Winter: Lower tolerance (shorter days, less dramatic effects)
-    seasonalAdjustment = 0.9;
-  }
-
-  // 5. FINAL SCORE CALCULATION
-  // Combine all factors using weighted approach
-  score =
-    baseScore * 0.3 + // Base total coverage (30% weight)
-    lowCloudScore * 0.25 + // Low cloud penalty (25% weight)
-    midCloudScore * 0.2 + // Mid cloud effect (20% weight)
-    highCloudScore * 0.25; // High cloud enhancement (25% weight)
-
-  // Apply interaction bonus and seasonal adjustment
-  score *= interactionBonus * seasonalAdjustment;
+  console.log("Low cloud score:", lowScore);
+  console.log("Mid cloud score:", midScore);
+  console.log("High cloud score:", highScore);
+  console.log("Cloud interaction bonus:", interactionBonus);
+  console.log("Cloud score:", score);
 
   // Ensure score stays within bounds
   score = Math.max(0.05, Math.min(1.0, score));
-  // Cloud coverage scoring completed
   return score;
 }
 
