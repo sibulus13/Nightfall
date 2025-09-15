@@ -17,6 +17,7 @@ export default function CacheDebugger({ className }: CacheDebuggerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [predictionsCacheSize, setPredictionsCacheSize] = useState(0);
   const [localStorageSize, setLocalStorageSize] = useState(0);
+  const [isClient, setIsClient] = useState(false);
 
   const { cachedLocations, predictions, markers, isCalculating } = useSelector(
     (state: {
@@ -29,8 +30,15 @@ export default function CacheDebugger({ className }: CacheDebuggerProps) {
     }) => state.map,
   );
 
+  // Set client flag on mount to prevent hydration mismatch
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   // Check predictions tab cache from localStorage
   useEffect(() => {
+    if (!isClient) return;
+
     const checkPredictionsCache = () => {
       try {
         const cached = localStorage.getItem("sunset-app-predictions-cache");
@@ -58,7 +66,7 @@ export default function CacheDebugger({ className }: CacheDebuggerProps) {
     checkPredictionsCache();
     const interval = setInterval(checkPredictionsCache, 2000); // Update every 2 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [isClient]);
 
   const cacheStats = {
     cachedLocations: cachedLocations.length,
@@ -118,8 +126,15 @@ export default function CacheDebugger({ className }: CacheDebuggerProps) {
           className="bg-background/80 backdrop-blur-sm"
         >
           <Database className="mr-1 h-3 w-3" />
-          Cache: M{cacheStats.totalMarkers} | P{cacheStats.predictionsCacheSize}{" "}
-          | {cacheStats.localStorageSize}KB
+          {isClient ? (
+            <>
+              Cache: M{cacheStats.totalMarkers} | P
+              {cacheStats.predictionsCacheSize} | {cacheStats.localStorageSize}
+              KB
+            </>
+          ) : (
+            <>Cache: Loading...</>
+          )}
         </Button>
       </div>
     );
