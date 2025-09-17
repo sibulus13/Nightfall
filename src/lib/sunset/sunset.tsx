@@ -553,8 +553,8 @@ function particulateScore(prediction: PredictionData) {
   const pm2_5 = prediction.pm2_5;
   // const pm10 = prediction.pm10;
 
-  let pm2_5_score = 1 - Math.abs((pm2_5 - 35) / 35);
-  pm2_5_score = Math.max(0.55, Math.min(1.01, pm2_5_score));
+  let pm2_5_score = 1 - Math.abs((pm2_5 - 25) / 25); 
+  pm2_5_score = Math.max(0.55, pm2_5_score);
 
   return pm2_5_score;
 }
