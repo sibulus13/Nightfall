@@ -1,4 +1,22 @@
 import Link from "next/link";
+import { type Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "About Nightfalls - Professional Sunset Prediction & Golden Hour App",
+  description:
+    "Learn about Nightfalls, the professional sunset prediction app for photographers and sunset enthusiasts. Discover our story, features, and mission to help you never miss another perfect sunset.",
+  keywords:
+    "about nightfalls, sunset prediction app, golden hour photography, sunset forecasting, photography planning, sunset quality prediction, about sunset app, nightfalls story",
+  alternates: {
+    canonical: "/About",
+  },
+  openGraph: {
+    title: "About Nightfalls - Professional Sunset Prediction App",
+    description:
+      "Learn about Nightfalls and our mission to help photographers and sunset enthusiasts never miss another perfect sunset.",
+    url: "https://www.nightfalls.ca/About",
+  },
+};
 
 const AboutPage = () => {
   return (
@@ -13,7 +31,7 @@ const AboutPage = () => {
           Nightfalls is a web application born from a photographer&apos;s simple
           desire: to never miss another spectacular sunset. We combine precise
           astronomical data with real-time weather forecasts to help you capture
-          or simply enjoy nature&apos;s daily masterpiece.
+          or simply enjoy nature&apos;s daily masterpiece. <Link href="/FAQ" className="text-orange-500 hover:text-orange-600 underline">Learn more about how our predictions work</Link>.
         </p>
       </div>
       <div></div>
@@ -65,7 +83,7 @@ const AboutPage = () => {
             - An adventure seeker looking for the perfect golden hour hike
           </li>
         </ul>
-        <p>Nightfalls helps you make the most of every sunset opportunity.</p>
+        <p>Nightfalls helps you make the most of every sunset opportunity. <Link href="/App" className="text-green-500 hover:text-green-600 underline font-semibold">Start planning your perfect sunset now →</Link></p>
       </div>
       <div>
         <h2>Our Story</h2>

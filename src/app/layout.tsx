@@ -9,6 +9,7 @@ import { ThemeProvider } from "~/components/themeProvider";
 import StoreProvider from "./StoreProvider";
 import { env } from "~/env";
 import { GoogleAnalytics } from "@next/third-parties/google";
+import { OrganizationSchema, WebSiteSchema, WebApplicationSchema } from "~/components/StructuredData";
 
 export const metadata: Metadata = {
   title: "Nightfalls - Best Sunset Times & Golden Hour Predictions Worldwide",
@@ -73,6 +74,11 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${GeistSans.variable}`}>
+      <head>
+        <OrganizationSchema />
+        <WebSiteSchema />
+        <WebApplicationSchema />
+      </head>
       <body>
         <ThemeProvider
           attribute="class"

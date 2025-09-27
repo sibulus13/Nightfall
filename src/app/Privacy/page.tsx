@@ -1,3 +1,22 @@
+import { type Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy - Nightfalls | Sunset App Data Protection & Privacy",
+  description:
+    "Read Nightfalls privacy policy to understand how we protect your data while providing sunset predictions, golden hour timing, and photography planning services.",
+  keywords:
+    "privacy policy, data protection, sunset app privacy, nightfalls privacy, location data, sunset prediction privacy",
+  alternates: {
+    canonical: "/Privacy",
+  },
+  openGraph: {
+    title: "Privacy Policy - Nightfalls Sunset Prediction App",
+    description:
+      "Learn how we protect your privacy while providing sunset predictions and golden hour timing.",
+    url: "https://www.nightfalls.ca/Privacy",
+  },
+};
+
 export default function PrivacyPage() {
   return (
     <div className="page gap-10">

@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+
+# Sitemaps
+Sitemap: https://www.nightfalls.ca/sitemap.xml
+
+# Block access to sensitive areas
+Disallow: /api/
+Disallow: /_next/
+Disallow: /node_modules/
+
+# Allow important pages for SEO
+Allow: /
+Allow: /App
+Allow: /About
+Allow: /FAQ
+Allow: /Contact
+Allow: /Privacy
+Allow: /Api-doc
+
+# Crawl delay (optional, helps prevent overloading)
+Crawl-delay: 1

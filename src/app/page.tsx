@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
+import Link from "next/link";
 import { CiSaveDown1 } from "react-icons/ci";
 import { GrScorecard } from "react-icons/gr";
 import { FcGlobe } from "react-icons/fc";
@@ -83,7 +84,7 @@ export default function MainPage() {
             & Golden Hour
           </h1>
           <p className="mt-4 max-w-2xl text-center text-lg text-foreground md:text-xl">
-            Get accurate sunset predictions, golden hour timing, and weather
+            Get accurate <Link href="/FAQ" className="text-orange-500 hover:text-orange-600 underline">sunset predictions</Link>, <Link href="/FAQ" className="text-orange-500 hover:text-orange-600 underline">golden hour timing</Link>, and weather
             forecasts to capture stunning sunset photos anywhere in the world.
           </p>
           <br></br>
@@ -137,10 +138,10 @@ export default function MainPage() {
               Photographer&apos;s Dream
             </h3>
             <p className="leading-relaxed text-muted-foreground">
-              Perfect for photographers! Get golden hour timing, weather
+              Perfect for photographers! Get <Link href="/FAQ" className="text-purple-500 hover:text-purple-600 underline">golden hour timing</Link>, weather
               forecasts, and sunset quality scores to plan your shoots. Never
-              miss the perfect lighting conditions for stunning sunset
-              photography.
+              miss the perfect lighting conditions for stunning <Link href="/FAQ" className="text-purple-500 hover:text-purple-600 underline">sunset
+              photography</Link>. <Link href="/App" className="text-purple-500 hover:text-purple-600 underline font-semibold">Try the app now →</Link>
             </p>
           </div>
         </div>
