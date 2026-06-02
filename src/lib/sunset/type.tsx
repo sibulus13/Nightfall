@@ -76,6 +76,7 @@ export type Prediction = {
     particulate: number;
     wind: number;
     temperature: number;
+    precipitation: number;
     stability: number;
     uv: number;
     aerosolOpticalDepth: number;

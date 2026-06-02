@@ -18,6 +18,7 @@ const dummyPredictionInstance: Prediction = {
     particulate: 0,
     wind: 0,
     temperature: 0,
+    precipitation: 0,
     stability: 0,
     uv: 0,
     aerosolOpticalDepth: 0,
