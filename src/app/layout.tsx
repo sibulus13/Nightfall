@@ -12,9 +12,10 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import { OrganizationSchema, WebSiteSchema, WebApplicationSchema } from "~/components/StructuredData";
 
 export const metadata: Metadata = {
-  title: "Nightfalls - Best Sunset Times & Golden Hour Predictions Worldwide",
+  title:
+    "Nightfalls - Sunset Forecasts, Golden Hour Times & Photo Spot Recommendations",
   description:
-    "Find the perfect sunset times, golden hour predictions, and sunset quality forecasts for any location worldwide. Get weekly sunset scores, photography timing, and weather conditions to capture stunning sunset photos.",
+    "Plan sunset photography with sunset quality forecasts, golden hour timing, blue hour guidance, and nearby viewpoint recommendations for any location worldwide.",
   keywords:
     "sunset times, golden hour, sunset predictions, sunset photography, sunset forecast, best sunset locations, sunset quality, sunset score, sunset timing, sunset weather, sunset app, sunset calculator, sunset finder, sunset planner, sunset photography tips, sunset colors, sunset viewing, sunset spots, sunset schedule, sunset calendar, sunset tracker",
   authors: [{ name: "Nightfalls" }],
@@ -30,9 +31,10 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "Nightfalls - Best Sunset Times & Golden Hour Predictions Worldwide",
+    title:
+      "Nightfalls - Sunset Forecasts, Golden Hour Times & Photo Spot Recommendations",
     description:
-      "Find the perfect sunset times, golden hour predictions, and sunset quality forecasts for any location worldwide. Get weekly sunset scores, photography timing, and weather conditions to capture stunning sunset photos.",
+      "Plan sunset photography with sunset quality forecasts, golden hour timing, blue hour guidance, and nearby viewpoint recommendations.",
     url: "https://www.nightfalls.ca",
     siteName: "Nightfalls",
     images: [
@@ -48,9 +50,10 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Nightfalls - Best Sunset Times & Golden Hour Predictions Worldwide",
+    title:
+      "Nightfalls - Sunset Forecasts, Golden Hour Times & Photo Spot Recommendations",
     description:
-      "Find the perfect sunset times, golden hour predictions, and sunset quality forecasts for any location worldwide.",
+      "Plan sunset photography with sunset forecasts, golden hour timing, blue hour guidance, and nearby viewpoint recommendations.",
     images: ["/og-image.jpg"],
   },
   robots: {

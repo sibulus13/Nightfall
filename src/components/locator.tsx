@@ -19,8 +19,14 @@ export default function Locator({
     <APIProvider apiKey={API_KEY}>
       <div className="flex gap-2">
         <PlaceAutocomplete onPlaceSelect={setSelectedPlace} value={value} />
-        <button onClick={handleLocationClick}>
-          <FaLocationCrosshairs className="h-10 w-10" />
+        <button
+          type="button"
+          onClick={handleLocationClick}
+          className="nf-icon-button h-10 w-10 shrink-0"
+          aria-label="Use current location"
+          title="Use current location"
+        >
+          <FaLocationCrosshairs className="h-4 w-4" />
         </button>
       </div>
     </APIProvider>

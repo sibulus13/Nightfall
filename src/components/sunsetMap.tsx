@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   APIProvider,
   Map,
@@ -15,6 +15,7 @@ import {
   setCurrentLocation,
 } from "~/lib/map/mapSlice";
 import type { RootState, AppDispatch } from "~/lib/store";
+import type { ScoreStats } from "~/lib/sunset/type";
 import { Button } from "~/components/ui/button";
 import { useMapData } from "~/hooks/useMapData";
 import {
@@ -23,8 +24,24 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { Play, Trash2, ChevronDown } from "lucide-react";
+import {
+  Aperture,
+  Binoculars,
+  Camera,
+  ChevronDown,
+  Footprints,
+  Landmark,
+  Loader2,
+  Mountain,
+  Play,
+  Plus,
+  Sparkles,
+  Trees,
+  Trash2,
+  Waves,
+} from "lucide-react";
 import CelestialIndicators from "./celestialIndicators";
+import type { SunsetSpot, SunsetSpotResponse } from "~/types/sunsetSpot";
 
 interface SunsetMapProps {
   initialLocation?: {
@@ -39,8 +56,28 @@ interface SunsetMapProps {
 
 const mapContainerStyle = {
   width: "100%",
-  height: "400px",
+  height: "520px",
 };
+
+const SUNSET_SPOT_RADIUS_METERS = 20000;
+const SUNSET_SPOT_LIMIT = 12;
+const SUNSET_SPOT_CACHE_TTL_MS = 15 * 60 * 1000;
+const SUNSET_SPOT_CACHE_KEY_PREFIX = "sunset-app-spot-cache-v2";
+const MAP_SETTLE_DELAY_MS = 900;
+const MIN_RECOMMENDATION_MOVE_METERS = 900;
+
+interface SunsetSpotCacheEntry {
+  expiresAt: number;
+  data: SunsetSpotResponse;
+}
+
+type SpotFilterGroup = "phases" | "locationTypes" | "features";
+
+interface ActiveSpotFilters {
+  phases: string[];
+  locationTypes: string[];
+  features: string[];
+}
 
 const SunsetMap: React.FC<SunsetMapProps> = ({
   initialLocation,
@@ -50,12 +87,29 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   onLocationChange,
 }) => {
   const [center, setCenter] = useState(initialLocation);
+  const [queryCenter, setQueryCenter] = useState(initialLocation);
   const [currentZoom, setCurrentZoom] = useState(zoomLevel);
+  const [sunsetSpots, setSunsetSpots] = useState<SunsetSpot[]>([]);
+  const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
+  const [isLoadingSpots, setIsLoadingSpots] = useState(false);
+  const [spotSource, setSpotSource] =
+    useState<SunsetSpotResponse["source"] | null>(null);
+  const [spotError, setSpotError] = useState<string | null>(null);
+  const [activeSpotFilters, setActiveSpotFilters] =
+    useState<ActiveSpotFilters>({
+      phases: [],
+      locationTypes: [],
+      features: [],
+    });
+  const mapSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const lastRecommendationCenterRef = useRef(initialLocation);
   const dispatch = useDispatch<AppDispatch>();
 
   // Get markers from Redux store
   const markers = useSelector((state: RootState) => state.map.markers);
-  const { isCalculating, selectedDayIndex, predictions } = useSelector(
+  const { isCalculating, selectedDayIndex, predictions, dayStats } = useSelector(
     (state: RootState) => state.map,
   );
 
@@ -63,6 +117,19 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   const { dateOptions, updateSelectedDay, availableDates } = useMapData({
     initialLocation,
   });
+  const availableSpotFilters = useMemo(
+    () => getAvailableSpotFilters(sunsetSpots),
+    [sunsetSpots],
+  );
+  const filteredSunsetSpots = useMemo(() => {
+    if (!hasActiveSpotFilters(activeSpotFilters)) {
+      return sunsetSpots;
+    }
+
+    return sunsetSpots.filter((spot) =>
+      doesSpotMatchFilters(spot, activeSpotFilters),
+    );
+  }, [activeSpotFilters, sunsetSpots]);
 
   // Function to get gradient background based on prediction score (matching predictions tab)
   const getScoreGradient = useCallback((score: number) => {
@@ -149,8 +216,93 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   useEffect(() => {
     if (initialLocation) {
       setCenter(initialLocation);
+      setQueryCenter(initialLocation);
+      lastRecommendationCenterRef.current = initialLocation;
     }
   }, [initialLocation]);
+
+  const applySunsetSpotResponse = useCallback((data: SunsetSpotResponse) => {
+    const candidates = data.candidates.map(normalizeSunsetSpot);
+
+    setSunsetSpots(candidates);
+    setSpotSource(data.source);
+    setActiveSpotFilters((currentFilters) =>
+      pruneActiveSpotFilters(currentFilters, candidates),
+    );
+    setSelectedSpotId((currentSelectedSpotId) => {
+      if (
+        currentSelectedSpotId &&
+        candidates.some((spot) => spot.id === currentSelectedSpotId)
+      ) {
+        return currentSelectedSpotId;
+      }
+
+      return candidates[0]?.id ?? null;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!queryCenter) {
+      return;
+    }
+
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => {
+      setIsLoadingSpots(true);
+      setSpotError(null);
+
+      const searchParams = new URLSearchParams({
+        lat: String(queryCenter.lat),
+        lon: String(queryCenter.lng),
+        radiusMeters: String(SUNSET_SPOT_RADIUS_METERS),
+        limit: String(SUNSET_SPOT_LIMIT),
+      });
+      const cacheKey = getSunsetSpotCacheKey(queryCenter);
+      const cachedResponse = getCachedSunsetSpotResponse(cacheKey);
+
+      if (cachedResponse) {
+        applySunsetSpotResponse(cachedResponse);
+        setIsLoadingSpots(false);
+        return;
+      }
+
+      fetch(`/api/locations/sunset-spots?${searchParams.toString()}`, {
+        signal: abortController.signal,
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error("Unable to load sunset spots");
+          }
+
+          return (await response.json()) as SunsetSpotResponse;
+        })
+        .then((data) => {
+          setCachedSunsetSpotResponse(cacheKey, data);
+          applySunsetSpotResponse(data);
+        })
+        .catch((error: unknown) => {
+          if (abortController.signal.aborted) {
+            return;
+          }
+
+          console.error("Error loading sunset spots:", error);
+          setSunsetSpots([]);
+          setSpotSource(null);
+          setSelectedSpotId(null);
+          setSpotError("Could not load nearby sunset spots.");
+        })
+        .finally(() => {
+          if (!abortController.signal.aborted) {
+            setIsLoadingSpots(false);
+          }
+        });
+    }, 650);
+
+    return () => {
+      clearTimeout(timeout);
+      abortController.abort();
+    };
+  }, [applySunsetSpotResponse, queryCenter]);
 
   // Helper function to calculate distance between two points
   const getDistance = (
@@ -206,38 +358,80 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     [markers, dispatch],
   );
 
+  const addSpotToMarkers = useCallback(
+    (spot: SunsetSpot) => {
+      if (markers.length < 5) {
+        dispatch(addMarker({ lat: spot.latitude, lng: spot.longitude }));
+      }
+    },
+    [dispatch, markers.length],
+  );
+
   const onBoundsChanged = useCallback(
     (event: MapCameraChangedEvent) => {
+      const nextZoom = event.detail.zoom;
+      const nextCenter = event.detail.center
+        ? {
+            lat: event.detail.center.lat,
+            lng: event.detail.center.lng,
+          }
+        : null;
+
+      if (nextZoom) {
+        setCurrentZoom(nextZoom);
+      }
+
       // Update the center state when user drags the map
-      if (event.detail.center) {
-        const newCenter = {
-          lat: event.detail.center.lat,
-          lng: event.detail.center.lng,
-        };
-        setCenter(newCenter);
+      if (!nextCenter) {
+        return;
+      }
 
-        // Save the new location to Redux store (which will save to localStorage)
-        dispatch(setCurrentLocation(newCenter));
+      setCenter(nextCenter);
 
-        // Notify parent component of location change
-        if (onLocationChange) {
-          onLocationChange(newCenter);
+      if (mapSettleTimeoutRef.current) {
+        clearTimeout(mapSettleTimeoutRef.current);
+      }
+
+      mapSettleTimeoutRef.current = setTimeout(() => {
+        const lastRecommendationCenter = lastRecommendationCenterRef.current;
+        const movedMeters = lastRecommendationCenter
+          ? getDistance(
+              lastRecommendationCenter.lat,
+              lastRecommendationCenter.lng,
+              nextCenter.lat,
+              nextCenter.lng,
+            )
+          : MIN_RECOMMENDATION_MOVE_METERS;
+
+        if (movedMeters < MIN_RECOMMENDATION_MOVE_METERS) {
+          return;
         }
-      }
 
-      // Update zoom state
-      if (event.detail.zoom) {
-        setCurrentZoom(event.detail.zoom);
-      }
+        lastRecommendationCenterRef.current = nextCenter;
+        setQueryCenter(nextCenter);
+        dispatch(setCurrentLocation(nextCenter));
+
+        if (onLocationChange) {
+          onLocationChange(nextCenter);
+        }
+      }, MAP_SETTLE_DELAY_MS);
     },
     [onLocationChange, dispatch],
   );
 
+  useEffect(() => {
+    return () => {
+      if (mapSettleTimeoutRef.current) {
+        clearTimeout(mapSettleTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div className="space-y-4">
       {/* Instructions and Controls - Above the Map */}
-      <div className="space-y-4">
-        <div className="text-center text-sm text-muted-foreground">
+      <div className="nf-panel p-3">
+        <div className="text-sm text-muted-foreground">
           <p>
             Click on the map to place markers (up to 5). Click on existing
             markers to remove them.
@@ -246,7 +440,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
         </div>
 
         {/* Controls Row - Date Selector Left, Action Buttons Right */}
-        <div className="flex items-center justify-between">
+        <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           {/* Day Selector - Left Side */}
           <div className="flex items-center">
             {dateOptions.length > 0 ? (
@@ -311,8 +505,12 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
         </div>
       </div>
 
+      {/* Aggregate banner — visible once ≥2 markers have predictions */}
+      {dayStats && <DayStatsBanner stats={dayStats} />}
+
       {/* Map */}
-      <div className="relative">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="relative overflow-hidden rounded-md border border-[#d9c8b6] bg-[#fffaf2] shadow-sm dark:border-[#3f3933] dark:bg-[#211f1c]">
         <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""}>
           <Map
             style={mapContainerStyle}
@@ -403,6 +601,25 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
                 </AdvancedMarker>
               );
             })}
+
+            {filteredSunsetSpots.map((spot) => {
+              const isSelected = spot.id === selectedSpotId;
+
+              return (
+                <AdvancedMarker
+                  key={spot.id}
+                  position={{ lat: spot.latitude, lng: spot.longitude }}
+                  onClick={() => setSelectedSpotId(spot.id)}
+                >
+                  <SunsetSpotMarker
+                    spot={spot}
+                    isSelected={isSelected}
+                    canAddMarker={markers.length < 5}
+                    onAddSpot={addSpotToMarkers}
+                  />
+                </AdvancedMarker>
+              );
+            })}
           </Map>
         </APIProvider>
 
@@ -415,8 +632,663 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
           />
         )}
       </div>
+
+      <SunsetSpotsPanel
+        spots={filteredSunsetSpots}
+        availableFilters={availableSpotFilters}
+        activeFilters={activeSpotFilters}
+        selectedSpotId={selectedSpotId}
+        isLoading={isLoadingSpots}
+        source={spotSource}
+        error={spotError}
+        onToggleFilter={(group, value) => {
+          setActiveSpotFilters((currentFilters) =>
+            toggleSpotFilter(currentFilters, group, value),
+          );
+        }}
+        onClearFilters={() =>
+          setActiveSpotFilters({
+            phases: [],
+            locationTypes: [],
+            features: [],
+          })
+        }
+        onSelectSpot={setSelectedSpotId}
+      />
+      </div>
     </div>
   );
 };
 
+function SunsetSpotMarker({
+  spot,
+  isSelected,
+  canAddMarker,
+  onAddSpot,
+}: {
+  spot: SunsetSpot;
+  isSelected: boolean;
+  canAddMarker: boolean;
+  onAddSpot: (spot: SunsetSpot) => void;
+}) {
+  const MarkerIcon = getSpotMarkerIcon(spot);
+  const notableQuality = getSpotMarkerLabel(spot);
+  const visibleBadges = spot.qualificationBadges.slice(0, 2);
+
+  return (
+    <div className="relative flex flex-col items-center">
+      <div
+        className={`flex h-10 w-10 items-center justify-center rounded-full border-2 bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600 text-white shadow-lg transition-transform ${
+          isSelected
+            ? "scale-125 border-white ring-4 ring-pink-300/55"
+            : "border-white/85"
+        }`}
+        title={notableQuality}
+      >
+        <MarkerIcon className="h-5 w-5" aria-hidden="true" />
+      </div>
+      <div className="h-2 w-2 -translate-y-1 rotate-45 border-b border-r border-white/80 bg-pink-500 shadow-sm" />
+
+      {isSelected && (
+        <div
+          className="absolute bottom-12 z-30 w-60 rounded-md border border-[#e5c0ae] bg-[#fffaf4] p-3 text-[#231b17] shadow-xl dark:border-[#5b4037] dark:bg-[#221a20] dark:text-[#f8ede7]"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
+          <div className="flex items-start gap-2">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600 text-white">
+              <MarkerIcon className="h-4 w-4" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold">{spot.name}</div>
+              <div className="mt-0.5 text-xs text-[#665047] dark:text-[#d9c6bd]">
+                {notableQuality} · {getPhaseLabel(spot.bestPhase)}
+              </div>
+            </div>
+          </div>
+
+          {visibleBadges.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {visibleBadges.map((badge) => (
+                <span
+                  key={badge}
+                  className="rounded-full bg-[#f2dfd5] px-2 py-0.5 text-[10px] font-semibold text-[#5d3028] dark:bg-white/10 dark:text-[#f3d4ca]"
+                >
+                  {badge}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-2 text-xs text-[#665047] dark:text-[#d9c6bd]">
+            Arrive by {formatSpotTime(spot.goldenHour.arriveBy)}
+          </div>
+
+          <button
+            type="button"
+            disabled={!canAddMarker}
+            onClick={() => onAddSpot(spot)}
+            className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-[#2a171d] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#4c2634] disabled:cursor-not-allowed disabled:opacity-55 dark:bg-[#ffd1ad] dark:text-[#21120d]"
+            title={canAddMarker ? "Add this spot to predictions" : "Marker limit reached"}
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            {canAddMarker ? "Add to predictions" : "Marker limit reached"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SunsetSpotsPanel({
+  spots,
+  availableFilters,
+  activeFilters,
+  selectedSpotId,
+  isLoading,
+  source,
+  error,
+  onToggleFilter,
+  onClearFilters,
+  onSelectSpot,
+}: {
+  spots: SunsetSpot[];
+  availableFilters: ActiveSpotFilters;
+  activeFilters: ActiveSpotFilters;
+  selectedSpotId: string | null;
+  isLoading: boolean;
+  source: SunsetSpotResponse["source"] | null;
+  error: string | null;
+  onToggleFilter: (group: SpotFilterGroup, value: string) => void;
+  onClearFilters: () => void;
+  onSelectSpot: (spotId: string) => void;
+}) {
+  const hasFilters = hasActiveSpotFilters(activeFilters);
+
+  return (
+    <aside className="nf-panel p-3">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="flex items-center gap-2 text-sm font-semibold">
+            <Camera className="h-4 w-4 text-orange-500" />
+            Recommended spots
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            {source === "live-overpass"
+              ? "Filtered from nearby map signals"
+              : source === "mixed"
+                ? "Map signals with local recommendations"
+              : "Local recommendations"}
+          </p>
+        </div>
+        {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+      </div>
+
+      {(availableFilters.phases.length > 0 ||
+        availableFilters.locationTypes.length > 0 ||
+        availableFilters.features.length > 0) && (
+        <div className="mb-3 space-y-2">
+          <SpotFilterSection
+            title="Sunset phase"
+            group="phases"
+            options={availableFilters.phases}
+            activeOptions={activeFilters.phases}
+            onToggleFilter={onToggleFilter}
+          />
+          <SpotFilterSection
+            title="Location type"
+            group="locationTypes"
+            options={availableFilters.locationTypes}
+            activeOptions={activeFilters.locationTypes}
+            onToggleFilter={onToggleFilter}
+          />
+          <SpotFilterSection
+            title="Scene qualities"
+            group="features"
+            options={availableFilters.features}
+            activeOptions={activeFilters.features}
+            onToggleFilter={onToggleFilter}
+          />
+          {hasFilters && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={onClearFilters}
+                className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+          {error}
+        </div>
+      )}
+
+      {isLoading && spots.length === 0 && <SunsetSpotLoadingState />}
+
+      <div className="mb-3 max-h-44 space-y-2 overflow-y-auto pr-1">
+        {spots.length === 0 && !isLoading ? (
+          <div className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
+            No recommendations match those filters.
+          </div>
+        ) : (
+          spots.map((spot) => (
+            <button
+              key={spot.id}
+              type="button"
+              onClick={() => onSelectSpot(spot.id)}
+              className={`w-full rounded-md border p-2 text-left transition-colors ${
+                spot.id === selectedSpotId
+                  ? "border-[#a6532d] bg-[#fff4e8] text-[#2b241f] dark:bg-[#33241d] dark:text-[#f7e4d4]"
+                  : "border-[#d9c8b6] bg-white/60 hover:bg-[#f5eee5] dark:border-[#3f3933] dark:bg-white/5 dark:hover:bg-white/10"
+              }`}
+              title={`Show ${spot.name} on the map`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="flex min-w-0 items-start gap-2">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600 text-white">
+                    {(() => {
+                      const SpotIcon = getSpotMarkerIcon(spot);
+                      return <SpotIcon className="h-3.5 w-3.5" aria-hidden="true" />;
+                    })()}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">
+                      {spot.name}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {getSpotMarkerLabel(spot)} · {getPhaseLabel(spot.bestPhase)}
+                    </span>
+                  </span>
+                </span>
+                <span
+                  className="shrink-0 rounded-full border border-[#e3c5b4] bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-[#6f3a28] dark:border-white/10 dark:bg-white/10 dark:text-[#f0c2b0]"
+                  aria-hidden="true"
+                >
+                  map
+                </span>
+              </div>
+            </button>
+          ))
+        )}
+      </div>
+
+      <div className="rounded-md border border-dashed border-[#dfc7b6] bg-white/45 p-2 text-xs text-muted-foreground dark:border-white/10 dark:bg-white/5">
+        Select a spot to open its map popup. Add promising places from the popup
+        and run predictions when you are ready.
+      </div>
+    </aside>
+  );
+}
+
+function SunsetSpotLoadingState() {
+  const loadingSteps = [
+    "Reading golden-hour timing",
+    "Checking horizon and water cues",
+    "Comparing view angles",
+    "Looking for reflection potential",
+    "Ranking nearby recommendations",
+  ];
+  const [stepIndex, setStepIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setStepIndex((currentStepIndex) =>
+        (currentStepIndex + 1) % loadingSteps.length,
+      );
+    }, 1200);
+
+    return () => window.clearInterval(interval);
+  }, [loadingSteps.length]);
+
+  return (
+    <div className="mb-3 rounded-md border border-orange-200 bg-orange-50 p-3">
+      <div className="mb-2 flex items-center gap-2 text-xs font-medium text-orange-950">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        {loadingSteps[stepIndex]}
+      </div>
+      <div className="grid grid-cols-5 gap-1">
+        {loadingSteps.map((step, index) => (
+          <div
+            key={step}
+            className={`h-1 rounded-full ${
+              index <= stepIndex ? "bg-orange-400" : "bg-orange-100"
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SpotFilterSection({
+  title,
+  group,
+  options,
+  activeOptions,
+  onToggleFilter,
+}: {
+  title: string;
+  group: SpotFilterGroup;
+  options: string[];
+  activeOptions: string[];
+  onToggleFilter: (group: SpotFilterGroup, value: string) => void;
+}) {
+  if (options.length === 0) {
+    return null;
+  }
+
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">
+        {title}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((option) => {
+          const isActive = activeOptions.includes(option);
+
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onToggleFilter(group, option)}
+              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                  isActive
+                    ? "border-[#a6532d] bg-[#efe1d1] text-[#3d3128] dark:bg-[#4b3326] dark:text-[#f7e4d4]"
+                    : "border-[#d9c8b6] bg-white/60 text-muted-foreground hover:text-foreground dark:border-[#3f3933] dark:bg-white/5"
+              }`}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function formatSpotTime(value: string): string {
+  return new Date(value).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function getAvailableSpotFilters(spots: SunsetSpot[]): ActiveSpotFilters {
+  return {
+    phases: getTopFilterValues(spots.flatMap(getSpotPhaseFilters), 8),
+    locationTypes: getTopFilterValues(spots.map(getLocationTypeFilter), 8),
+    features: getTopFilterValues(spots.flatMap(getSceneQualityFilters), 10),
+  };
+}
+
+function getTopFilterValues(values: string[], limit: number): string[] {
+  const counts = new globalThis.Map<string, number>();
+
+  values
+    .filter((value) => value.length > 0)
+    .forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
+
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([value]) => value);
+}
+
+function getSpotPhaseFilters(spot: SunsetSpot): string[] {
+  return Array.from(
+    new Set([
+      normalizeFilterLabel(getPhaseLabel(spot.bestPhase)),
+      ...spot.recommendedFor.map(normalizeFilterLabel),
+    ]),
+  );
+}
+
+function getLocationTypeFilter(spot: SunsetSpot): string {
+  return normalizeFilterLabel(spot.kind);
+}
+
+function getSceneQualityFilters(spot: SunsetSpot): string[] {
+  const phaseLabels = new Set(getSpotPhaseFilters(spot));
+  const locationType = getLocationTypeFilter(spot);
+
+  return Array.from(
+    new Set(
+      [...spot.qualificationBadges, ...spot.searchTags]
+        .map(normalizeFilterLabel)
+        .filter(
+          (tag) =>
+            tag.length > 0 && tag !== locationType && !phaseLabels.has(tag),
+        ),
+    ),
+  ).slice(0, 8);
+}
+
+function doesSpotMatchFilters(
+  spot: SunsetSpot,
+  activeFilters: ActiveSpotFilters,
+): boolean {
+  return (
+    matchesAnyFilter(getSpotPhaseFilters(spot), activeFilters.phases) &&
+    matchesAnyFilter([getLocationTypeFilter(spot)], activeFilters.locationTypes) &&
+    matchesAnyFilter(getSceneQualityFilters(spot), activeFilters.features)
+  );
+}
+
+function matchesAnyFilter(values: string[], activeValues: string[]): boolean {
+  if (activeValues.length === 0) {
+    return true;
+  }
+
+  return activeValues.some((activeValue) => values.includes(activeValue));
+}
+
+function hasActiveSpotFilters(activeFilters: ActiveSpotFilters): boolean {
+  return (
+    activeFilters.phases.length > 0 ||
+    activeFilters.locationTypes.length > 0 ||
+    activeFilters.features.length > 0
+  );
+}
+
+function toggleSpotFilter(
+  activeFilters: ActiveSpotFilters,
+  group: SpotFilterGroup,
+  value: string,
+): ActiveSpotFilters {
+  const currentValues = activeFilters[group];
+  const nextValues = currentValues.includes(value)
+    ? currentValues.filter((currentValue) => currentValue !== value)
+    : [...currentValues, value];
+
+  return {
+    ...activeFilters,
+    [group]: nextValues,
+  };
+}
+
+function pruneActiveSpotFilters(
+  activeFilters: ActiveSpotFilters,
+  spots: SunsetSpot[],
+): ActiveSpotFilters {
+  const availableFilters = getAvailableSpotFilters(spots);
+
+  return {
+    phases: activeFilters.phases.filter((phase) =>
+      availableFilters.phases.includes(phase),
+    ),
+    locationTypes: activeFilters.locationTypes.filter((locationType) =>
+      availableFilters.locationTypes.includes(locationType),
+    ),
+    features: activeFilters.features.filter((feature) =>
+      availableFilters.features.includes(feature),
+    ),
+  };
+}
+
+function normalizeFilterLabel(value: string): string {
+  return value
+    .replaceAll("_", " ")
+    .replaceAll("-", " ")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function normalizeSunsetSpot(spot: SunsetSpot): SunsetSpot {
+  const legacySpot = spot as SunsetSpot & {
+    phaseScores?: SunsetSpot["phaseScores"];
+    bestPhase?: SunsetSpot["bestPhase"];
+    recommendedFor?: SunsetSpot["recommendedFor"];
+    viewingDirections?: SunsetSpot["viewingDirections"];
+  };
+  const phaseScores = legacySpot.phaseScores ?? {
+    goldenHour: spot.viewQualityScore,
+    sunDisk: spot.westwardViewScore,
+    beltOfVenus: spot.viewQualityScore,
+    civilTwilight: spot.scenicScore,
+    blueHour: spot.viewQualityScore,
+  };
+
+  return {
+    ...spot,
+    phaseScores,
+    bestPhase: legacySpot.bestPhase ?? getBestPhaseFromScores(phaseScores),
+    recommendedFor:
+      legacySpot.recommendedFor?.length > 0
+        ? legacySpot.recommendedFor
+        : [getPhaseLabel(getBestPhaseFromScores(phaseScores))],
+    viewingDirections: legacySpot.viewingDirections ?? {
+      sunsetAzimuthDegrees: 270,
+      antisolarAzimuthDegrees: 90,
+      sideLightAzimuthDegrees: [180, 0],
+    },
+  };
+}
+
+function getBestPhaseFromScores(
+  phaseScores: SunsetSpot["phaseScores"],
+): SunsetSpot["bestPhase"] {
+  return (Object.entries(phaseScores).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+    "goldenHour") as SunsetSpot["bestPhase"];
+}
+
+function getPhaseLabel(phase: SunsetSpot["bestPhase"]): string {
+  const labels: Record<SunsetSpot["bestPhase"], string> = {
+    goldenHour: "golden hour",
+    sunDisk: "sun disk",
+    beltOfVenus: "Belt of Venus",
+    civilTwilight: "civil twilight",
+    blueHour: "blue hour",
+  };
+
+  return labels[phase];
+}
+
+function getSpotMarkerIcon(spot: SunsetSpot): typeof Camera {
+  const searchableText = [
+    spot.kind,
+    ...spot.qualificationBadges,
+    ...spot.searchTags,
+    ...spot.recommendedFor,
+    getPhaseLabel(spot.bestPhase),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  if (/beach|water|river|lake|ocean|pier|reflection/.exec(searchableText)) {
+    return Waves;
+  }
+
+  if (/mountain|elevation|ridge|hill|lookout|viewpoint/.exec(searchableText)) {
+    return Mountain;
+  }
+
+  if (/trail|walk|path|hike/.exec(searchableText)) {
+    return Footprints;
+  }
+
+  if (/park|garden|forest|green/.exec(searchableText)) {
+    return Trees;
+  }
+
+  if (/lighthouse|landmark|tower|bridge|skyline/.exec(searchableText)) {
+    return Landmark;
+  }
+
+  if (/venus|twilight|blue hour|purple|pink/.exec(searchableText)) {
+    return Sparkles;
+  }
+
+  if (/foreground|composition|photo|camera/.exec(searchableText)) {
+    return Aperture;
+  }
+
+  return Binoculars;
+}
+
+function getSpotMarkerLabel(spot: SunsetSpot): string {
+  const kind = normalizeFilterLabel(spot.kind);
+  const sceneQuality =
+    spot.qualificationBadges[0] ?? spot.searchTags[0] ?? "Photo spot";
+
+  return normalizeFilterLabel(sceneQuality || kind);
+}
+
+function getSunsetSpotCacheKey(center: { lat: number; lng: number }): string {
+  return [
+    SUNSET_SPOT_CACHE_KEY_PREFIX,
+    center.lat.toFixed(3),
+    center.lng.toFixed(3),
+    SUNSET_SPOT_RADIUS_METERS,
+    SUNSET_SPOT_LIMIT,
+  ].join(":");
+}
+
+function getCachedSunsetSpotResponse(
+  cacheKey: string,
+): SunsetSpotResponse | null {
+  try {
+    const rawCacheEntry = localStorage.getItem(cacheKey);
+
+    if (!rawCacheEntry) {
+      return null;
+    }
+
+    const cacheEntry = JSON.parse(rawCacheEntry) as SunsetSpotCacheEntry;
+
+    if (cacheEntry.expiresAt <= Date.now()) {
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+
+    return cacheEntry.data;
+  } catch {
+    localStorage.removeItem(cacheKey);
+    return null;
+  }
+}
+
+function setCachedSunsetSpotResponse(
+  cacheKey: string,
+  data: SunsetSpotResponse,
+): void {
+  const cacheEntry: SunsetSpotCacheEntry = {
+    data,
+    expiresAt: Date.now() + SUNSET_SPOT_CACHE_TTL_MS,
+  };
+
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(cacheEntry));
+  } catch {
+    // Best effort only; localStorage can be full or disabled.
+  }
+}
+
+function DayStatsBanner({ stats }: { stats: ScoreStats }) {
+  const low  = Math.max(0, stats.mean - stats.std);
+  const high = Math.min(100, stats.mean + stats.std);
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
+      <div className="mb-2 flex items-center justify-between text-white/70">
+        <span>
+          Area avg <span className="font-semibold text-white">{stats.mean}%</span>
+          {" "}+/-{stats.std}
+        </span>
+        <span className="text-white/50">
+          {stats.count} location{stats.count !== 1 ? "s" : ""}
+          {" / "}range {stats.min}-{stats.max}%
+        </span>
+      </div>
+      {/* Linear range bar */}
+      <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/10">
+        {/* +/-1sigma band */}
+        <div
+          className="absolute h-full bg-gradient-to-r from-orange-400/60 via-pink-400/70 to-purple-400/60"
+          style={{ left: `${low}%`, width: `${high - low}%` }}
+        />
+        {/* Mean tick */}
+        <div
+          className="absolute h-full w-0.5 bg-white"
+          style={{ left: `${stats.mean}%` }}
+        />
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] text-white/40">
+        <span>0</span>
+        <span>50</span>
+        <span>100</span>
+      </div>
+    </div>
+  );
+}
+
 export default SunsetMap;
+

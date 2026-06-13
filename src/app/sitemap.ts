@@ -1,9 +1,10 @@
 import type { MetadataRoute } from 'next'
+import { sunsetRegions } from '~/lib/regions/sunsetRegions'
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = 'https://www.nightfalls.ca'
 
-  return [
+  const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: baseUrl,
       lastModified: new Date(),
@@ -32,7 +33,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: `${baseUrl}/Api-doc`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
-      priority: 0.6,
+      priority: 0.55,
     },
     {
       url: `${baseUrl}/Contact`,
@@ -47,4 +48,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.3,
     },
   ]
+
+  const locationRoutes: MetadataRoute.Sitemap = sunsetRegions.map((region) => ({
+    url: `${baseUrl}/locations/${region.slug}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly',
+    priority: 0.75,
+  }))
+
+  return [...staticRoutes, ...locationRoutes]
 }

@@ -5,7 +5,7 @@ export function OrganizationSchema() {
     "name": "Nightfalls",
     "url": "https://www.nightfalls.ca",
     "logo": "https://www.nightfalls.ca/favicon.png",
-    "description": "Find the perfect sunset times, golden hour predictions, and sunset quality forecasts for any location worldwide.",
+    "description": "Plan sunset photography with sunset quality forecasts, golden hour timing, blue hour guidance, and nearby viewpoint recommendations.",
     "foundingDate": "2024",
     "contactPoint": {
       "@type": "ContactPoint",
@@ -33,7 +33,7 @@ export function WebSiteSchema() {
     "@type": "WebSite",
     "name": "Nightfalls",
     "url": "https://www.nightfalls.ca",
-    "description": "Best sunset times and golden hour predictions worldwide",
+    "description": "Sunset forecasts, golden hour times, blue hour guidance, and nearby sunset photography spot recommendations.",
     "potentialAction": {
       "@type": "SearchAction",
       "target": {
@@ -58,8 +58,8 @@ export function WebApplicationSchema() {
     "@type": "WebApplication",
     "name": "Nightfalls Sunset Predictor",
     "url": "https://www.nightfalls.ca/App",
-    "description": "Get accurate sunset predictions, golden hour timing, and weather forecasts to capture stunning sunset photos anywhere in the world.",
-    "applicationCategory": "Photography, Weather",
+    "description": "Get sunset predictions, golden hour timing, blue hour guidance, weather forecasts, and nearby viewpoint recommendations for sunset photography.",
+    "applicationCategory": "PhotographyApplication",
     "operatingSystem": "Web Browser",
     "offers": {
       "@type": "Offer",
@@ -69,6 +69,10 @@ export function WebApplicationSchema() {
     "featureList": [
       "Sunset time predictions",
       "Golden hour calculations",
+      "Blue hour and twilight guidance",
+      "Nearby sunset spot recommendations",
+      "Map-based viewpoint scouting",
+      "Phase-specific sunset photography scoring",
       "Weather integration",
       "Sunset quality forecasting",
       "Global location support",
@@ -92,26 +96,42 @@ export function FAQSchema() {
     "mainEntity": [
       {
         "@type": "Question",
-        "name": "What is golden hour and when does it occur?",
+        "name": "What is golden hour?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Golden hour refers to the period shortly after sunrise and before sunset when the sun is low on the horizon (typically between 6 degrees below and 6 degrees above the horizon). During this time, the light is warmer, softer, and more flattering than midday sun. Golden hour typically lasts 1-2 hours near the equator, but can be much longer at higher latitudes, especially during certain seasons."
+          "text": "Golden hour is the warm, low-angle light before sunset or after sunrise. It is usually best for portraits, foreground texture, side light, and scenes where you want warm color on the subject."
         }
       },
       {
         "@type": "Question",
-        "name": "How accurate are sunset time predictions?",
+        "name": "What is the sun disk phase?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Sunset times are calculated using precise astronomical formulas and are accurate to within one minute for most locations. However, factors like elevation, atmospheric conditions, and local geography can affect the exact moment you see the sun disappear. Our predictions account for your specific location and elevation for maximum accuracy."
+          "text": "The sun disk phase is the short window when the visible sun is close to the horizon. It is best for silhouettes, compressed telephoto compositions, clean horizon lines, and scenes where the actual circle of the sun matters."
         }
       },
       {
         "@type": "Question",
-        "name": "How does location affect sunset times?",
+        "name": "What is blue hour?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Your latitude dramatically affects sunset timing and duration. Near the equator, sunset times change minimally throughout the year and golden hour is shorter. At higher latitudes, sunset times vary greatly by season - in summer, sunset can occur very late with extended golden hours, while winter brings early sunsets. Your elevation also matters: higher altitudes see the sun longer."
+          "text": "Blue hour is the period after sunset when the sun is below the horizon and the sky turns cooler blue. It is especially useful for city lights, water reflections, silhouettes, and calmer contrast."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is the Belt of Venus?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "The Belt of Venus is the pink or purple band that appears opposite the sunset direction shortly after sunset. For this phase, the best composition may face away from the sun toward the antisolar sky."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is civil twilight?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Civil twilight is the brighter twilight period just after sunset, before the sky becomes fully dark. It is useful for balanced landscape detail, soft color, and photos where you still want readable foregrounds."
         }
       },
       {
@@ -119,23 +139,23 @@ export function FAQSchema() {
         "name": "How do you predict sunset quality?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Our sunset quality predictions analyze multiple weather factors including cloud cover, humidity, atmospheric pressure, and particulate matter. The best sunsets often occur with 30-70% cloud coverage, low humidity, stable atmospheric pressure, and clear air. We use advanced weather models to forecast these conditions up to 7 days in advance, giving you a quality score from poor to excellent."
+          "text": "Nightfalls combines astronomical timing with forecast signals such as cloud layers, visibility, humidity, pressure, precipitation, air quality, and atmospheric stability. The score is a planning signal, not a guarantee."
         }
       },
       {
         "@type": "Question",
-        "name": "When is the best time to arrive for sunset photography?",
+        "name": "How does Nightfalls recommend sunset locations?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Arrive at your location 45-60 minutes before sunset to allow time for setup, test shots, and composition adjustments. The best light often starts 30 minutes before sunset and continues 30 minutes after. Don't leave immediately after sunset - blue hour provides excellent opportunities for different types of shots, especially in urban settings."
+          "text": "The recommendation model looks for map and local-reference signals such as water, elevation, viewpoints, parks, beaches, open horizons, western exposure, public access, and phase-specific fit."
         }
       },
       {
         "@type": "Question",
-        "name": "How does Nightfalls differ from other sunset apps?",
+        "name": "Can I compare my own saved locations?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Nightfalls combines precise astronomical calculations with detailed weather forecasting to provide comprehensive sunset planning. Unlike basic weather apps, we specifically analyze atmospheric conditions that affect sunset quality. Our scoring system helps you prioritize which evenings are worth planning around, and our global coverage works anywhere in the world with location-specific accuracy."
+          "text": "Yes. Use the map planner to save up to five pins, compare forecasts by date, and add recommended spots into your prediction set."
         }
       }
     ]

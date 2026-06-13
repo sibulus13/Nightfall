@@ -1,4 +1,4 @@
-import { type PredictionData } from "~/lib/sunset/type";
+import { type PredictionData, type Prediction, type ScoreStats } from "~/lib/sunset/type";
 
 /**
  * Weighted additive scoring (7 factors, weights sum to 1.0) with a single
@@ -43,6 +43,12 @@ export function calculateSunsetScore(prediction: PredictionData) {
   const o3Score  = ozoneScore(prediction);
   const no2Score = nitrogenDioxideScore(prediction);
 
+  // Std dev of the 7 weighted factor scores (0–100). High spread = mixed signals = wide ± band.
+  const factorValues = [cCScore, vsScore, hScore, pScore, aScore, wScore, tScore].map(s => s * 100);
+  const factorMean = factorValues.reduce((a, b) => a + b, 0) / factorValues.length;
+  const factorVariance = factorValues.reduce((a, b) => a + (b - factorMean) ** 2, 0) / factorValues.length;
+  const confidence = Math.round(Math.sqrt(factorVariance));
+
   return {
     score:               Math.round(finalScore  * 100),
     cloudCoverage:       Math.round(cCScore     * 100),
@@ -59,6 +65,7 @@ export function calculateSunsetScore(prediction: PredictionData) {
     europeanAQI:         Math.round(aqiScore    * 100),
     ozone:               Math.round(o3Score     * 100),
     nitrogenDioxide:     Math.round(no2Score    * 100),
+    confidence,
   };
 }
 
@@ -188,6 +195,20 @@ function precipitationBlocker(prediction: PredictionData): number {
   if (prob < 70) return 0.60 - ((prob - 50) / 20) * 0.25;
   if (prob < 90) return 0.35 - ((prob - 70) / 20) * 0.20;
   return Math.max(0.05, 0.15 - (prob - 90) * 0.01);
+}
+
+export function aggregateScores(predictions: Prediction[]): ScoreStats {
+  if (predictions.length === 0) return { mean: 0, std: 0, min: 0, max: 0, count: 0 };
+  const scores = predictions.map((p) => p.score);
+  const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const variance = scores.reduce((a, b) => a + (b - mean) ** 2, 0) / scores.length;
+  return {
+    mean: Math.round(mean),
+    std: Math.round(Math.sqrt(variance)),
+    min: Math.min(...scores),
+    max: Math.max(...scores),
+    count: scores.length,
+  };
 }
 
 // --- Diagnostic only (not included in main score) ---

@@ -1,0 +1,35 @@
+# Nightfalls
+
+Nightfalls is a web app for planning sunset photography. It provides sunset
+quality forecasts, golden hour timing, blue hour and twilight guidance, and
+nearby sunset spot recommendations.
+
+## Primary URLs
+
+- Home: https://www.nightfalls.ca/
+- App: https://www.nightfalls.ca/App
+- FAQ: https://www.nightfalls.ca/FAQ
+- API waitlist: https://www.nightfalls.ca/Api-doc
+- Vancouver sunset guide: https://www.nightfalls.ca/locations/vancouver-bc
+- Surrey sunset guide: https://www.nightfalls.ca/locations/surrey-bc
+- Coquitlam sunset guide: https://www.nightfalls.ca/locations/coquitlam-bc
+
+## What Nightfalls Helps With
+
+- Forecast whether sunset conditions are promising for a selected location.
+- Compare saved map pins for sunset quality over upcoming days.
+- Find nearby recommended sunset viewpoints.
+- Filter sunset spots by sunset phase, location type, and scene qualities.
+- Plan arrival time for golden hour, sunset, Belt of Venus, twilight, and blue hour.
+
+## Data Signals
+
+Nightfalls combines astronomical timing, weather forecasts, cloud cover,
+visibility, humidity, atmospheric quality, map signals, local validated
+recommendations, and cached location discovery.
+
+## Current Brand Position
+
+Nightfalls is best described as a sunset photography planning app rather than a
+generic weather app. The strongest product language is: sunset forecast, golden
+hour planner, blue hour guide, and sunset spot recommender.

@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { type Prediction } from "../sunset/type";
+import { type Prediction, type ScoreStats } from "../sunset/type";
 import { getSunsetPrediction } from "../sunset/sunset";
+import { aggregateScores } from "../sunset/scoring";
 
 interface MapMarker {
   lat: number;
@@ -73,8 +74,8 @@ interface MapState {
   currentLocation: { lat: number; lng: number } | null;
   isRateLimited: boolean;
   rateLimitMessage: string;
-  // Add cache tracking - use array instead of Set for serialization
   cachedLocations: string[];
+  dayStats: ScoreStats | null;
 }
 
 // Helper functions for localStorage
@@ -112,42 +113,10 @@ const getDefaultInitialState = (): MapState => ({
   isRateLimited: false,
   rateLimitMessage: "",
   cachedLocations: [],
+  dayStats: null,
 });
 
-// Load initial state from localStorage (client-side only)
-const loadInitialState = (): MapState => {
-  // During SSR, return default state to prevent hydration mismatch
-  if (typeof window === "undefined") {
-    return getDefaultInitialState();
-  }
-
-  const savedMarkers =
-    (loadFromLocalStorage("sunset-app-markers") as MapMarker[]) || [];
-  const savedLocation = loadFromLocalStorage("sunset-app-last-location") as {
-    lat: number;
-    lng: number;
-  } | null;
-  const savedPredictions =
-    (loadFromLocalStorage("sunset-app-predictions") as Record<
-      string,
-      Prediction | null
-    >) || {};
-
-  return {
-    markers: savedMarkers,
-    predictions: savedPredictions,
-    loadingStates: {},
-    isCalculating: false,
-    availableDates: [],
-    selectedDayIndex: 0,
-    currentLocation: savedLocation,
-    isRateLimited: false,
-    rateLimitMessage: "",
-    cachedLocations: [],
-  };
-};
-
-const initialState: MapState = loadInitialState();
+const initialState: MapState = getDefaultInitialState();
 
 // Async thunk to fetch predictions for a marker with caching
 export const fetchMarkerPrediction = createAsyncThunk(
@@ -359,10 +328,10 @@ export const mapSlice = createSlice({
   reducers: {
     setMarkers: (state, action: { payload: MapMarker[] }) => {
       state.markers = action.payload;
-      // Clear predictions and loading states when markers change
       state.predictions = {};
       state.loadingStates = {};
       state.isCalculating = false;
+      state.dayStats = null;
     },
     addMarker: (state, action: { payload: { lat: number; lng: number } }) => {
       // Only add if we have less than 5 markers
@@ -394,8 +363,8 @@ export const mapSlice = createSlice({
       state.predictions = {};
       state.loadingStates = {};
       state.isCalculating = false;
+      state.dayStats = null;
 
-      // Clear from localStorage
       saveToLocalStorage("sunset-app-markers", []);
       saveToLocalStorage("sunset-app-predictions", {});
     },
@@ -524,7 +493,12 @@ export const mapSlice = createSlice({
         });
         state.isCalculating = false;
 
-        // Save predictions to localStorage
+        // Recompute aggregate stats across all markers that have predictions
+        const resolved = Object.values(state.predictions).filter(
+          (p): p is Prediction => p !== null,
+        );
+        state.dayStats = resolved.length >= 2 ? aggregateScores(resolved) : null;
+
         saveToLocalStorage("sunset-app-predictions", state.predictions);
       })
       .addCase(fetchBatchPredictions.rejected, (state, action) => {

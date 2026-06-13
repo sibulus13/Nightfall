@@ -1,18 +1,18 @@
 import { type Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "API Documentation - Nightfalls | Sunset Prediction API for Developers",
+  title: "Nightfalls API Waitlist",
   description:
-    "Access Nightfalls sunset prediction API for developers. Integrate sunset timing, golden hour calculations, and sunset quality forecasting into your applications.",
+    "Join the Nightfalls API waitlist for future access to sunset forecasts, golden hour timing, location recommendations, and phase-aware photo planning data.",
   keywords:
-    "sunset API, sunset prediction API, golden hour API, weather API, photography API, sunset forecast API, developer tools, nightfalls API",
+    "nightfalls api waitlist, sunset API, golden hour API, sunset forecast API, photography planning API",
   alternates: {
     canonical: "/Api-doc",
   },
   openGraph: {
-    title: "Nightfalls API - Sunset Prediction for Developers",
+    title: "Nightfalls API Waitlist",
     description:
-      "Integrate sunset predictions and golden hour timing into your applications with our developer API.",
+      "Join the waitlist for future developer access to Nightfalls sunset planning data.",
     url: "https://www.nightfalls.ca/Api-doc",
   },
 };

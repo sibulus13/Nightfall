@@ -25,6 +25,7 @@ const dummyPredictionInstance: Prediction = {
     europeanAQI: 0,
     ozone: 0,
     nitrogenDioxide: 0,
+    confidence: 0,
   },
   cloud_cover: 0,
   cloud_cover_low: 0,

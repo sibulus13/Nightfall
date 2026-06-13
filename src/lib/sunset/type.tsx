@@ -59,6 +59,14 @@ export type AirQualityForecast = {
   };
 };
 
+export type ScoreStats = {
+  mean: number;
+  std: number;
+  min: number;
+  max: number;
+  count: number;
+};
+
 export type Prediction = {
   score: number;
   golden_hour: {
@@ -83,6 +91,7 @@ export type Prediction = {
     europeanAQI: number;
     ozone: number;
     nitrogenDioxide: number;
+    confidence: number;
   };
   cloud_cover: number;
   cloud_cover_low: number;

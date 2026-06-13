@@ -22,7 +22,7 @@ export const PlaceAutocomplete = ({
     if (!places || !inputRef.current) return;
 
     const options = {
-      fields: ["geometry"],
+      fields: ["formatted_address", "geometry", "name"],
       types: ["(cities)"],
     };
 
@@ -47,13 +47,13 @@ export const PlaceAutocomplete = ({
   };
 
   return (
-    <div className="rounded-2xl border-2 border-black p-2">
+    <div className="min-w-0 flex-1 rounded-md border border-[#d7c1ad] bg-white/80 px-3 py-2 dark:border-white/10 dark:bg-black/20">
       <input
         ref={inputRef}
         value={inputValue}
         onChange={handleInputChange}
-        placeholder="Enter location"
-        className="bg-transparent"
+        placeholder="Search city"
+        className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-muted-foreground"
       />
     </div>
   );

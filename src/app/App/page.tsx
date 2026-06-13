@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { type Prediction } from "~/lib/sunset/type";
 import { TbSunset2 } from "react-icons/tb";
-import { MapPin } from "lucide-react";
+import { MapPin, Route, Search } from "lucide-react";
 import { TooltipProvider } from "~/components/ui/tooltip";
 
 import Locator from "~/components/locator";
@@ -11,7 +11,11 @@ import PredictionCard from "~/components/predictionCard";
 import { useSelector } from "react-redux";
 import usePrediction from "~/hooks/usePrediction";
 import { useMapData } from "~/hooks/useMapData";
-import { clearRateLimit, hydrateFromLocalStorage } from "~/lib/map/mapSlice";
+import {
+  clearRateLimit,
+  hydrateFromLocalStorage,
+  setCurrentLocation as setMapCurrentLocation,
+} from "~/lib/map/mapSlice";
 import { useDispatch } from "react-redux";
 import { areCoordinatesEqual } from "~/lib/utils";
 import CacheDebugger from "~/components/CacheDebugger";
@@ -27,6 +31,12 @@ const truncateScore = (score: number, lowerLimit = 0, upperLimit = 100) => {
   score = (score / 100) * range + lowerLimit;
   return score.toFixed(0);
 };
+
+type AppTab = "predictions" | "map";
+
+const APP_ACTIVE_TAB_STORAGE_KEY = "sunset-app-active-tab";
+const URL_COORDINATE_MIN = -180;
+const URL_COORDINATE_MAX = 180;
 
 // Function to get location name from coordinates
 const getLocationName = async (
@@ -71,14 +81,39 @@ const getLocationName = async (
   return null;
 };
 
+function getUrlLocation(): { lat: number; lng: number } | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const lat = Number(searchParams.get("lat"));
+  const lng = Number(searchParams.get("lon") ?? searchParams.get("lng"));
+
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < URL_COORDINATE_MIN ||
+    lng > URL_COORDINATE_MAX
+  ) {
+    return null;
+  }
+
+  return { lat, lng };
+}
+
 export default function AppPage() {
   const { predict } = usePrediction();
   const dispatch = useDispatch();
   const [currentLocation, setCurrentLocation] = useState({ lat: 0, lng: 0 });
-  const [activeTab, setActiveTab] = useState("predictions"); // Default to predictions tab
+  const [activeTab, setActiveTab] = useState<AppTab>("predictions");
+  const [isActiveTabHydrated, setIsActiveTabHydrated] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [locationName, setLocationName] = useState<string>("");
   const mapLocationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasAppliedUrlLocationRef = useRef(false);
 
   // Memoize the initial location to prevent unnecessary re-renders
   const memoizedInitialLocation = useMemo(() => {
@@ -118,6 +153,27 @@ export default function AppPage() {
   useEffect(() => {
     dispatch(hydrateFromLocalStorage());
   }, [dispatch]);
+
+  useEffect(() => {
+    const savedTab = localStorage.getItem(APP_ACTIVE_TAB_STORAGE_KEY);
+    const urlTab = new URLSearchParams(window.location.search).get("tab");
+
+    if (urlTab === "map" || urlTab === "predictions") {
+      setActiveTab(urlTab);
+    } else if (savedTab === "map" || savedTab === "predictions") {
+      setActiveTab(savedTab);
+    }
+
+    setIsActiveTabHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isActiveTabHydrated) {
+      return;
+    }
+
+    localStorage.setItem(APP_ACTIVE_TAB_STORAGE_KEY, activeTab);
+  }, [activeTab, isActiveTabHydrated]);
 
   // Note: Removed auto-switching to map tab - user stays on predictions tab by default
 
@@ -201,6 +257,20 @@ export default function AppPage() {
   useEffect(() => {
     // Only run this effect if we don't have a current location set
     if (currentLocation.lat === 0 && currentLocation.lng === 0) {
+      const urlLocation = getUrlLocation();
+
+      if (urlLocation && !hasAppliedUrlLocationRef.current) {
+        hasAppliedUrlLocationRef.current = true;
+        setCurrentLocation(urlLocation);
+        setActiveTab("map");
+        dispatch(setMapCurrentLocation(urlLocation));
+        void getLocationName(urlLocation.lat, urlLocation.lng).then((name) => {
+          if (name) setLocationName(name);
+        });
+        setIsInitialized(true);
+        return;
+      }
+
       // First check if there's a location in the map slice (from main page)
       if (mapLocation) {
         setCurrentLocation(mapLocation);
@@ -230,7 +300,7 @@ export default function AppPage() {
 
     // Mark as initialized after the first run
     setIsInitialized(true);
-  }, [currentLocation.lat, currentLocation.lng, mapLocation, predict]);
+  }, [currentLocation.lat, currentLocation.lng, dispatch, mapLocation, predict]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -243,7 +313,8 @@ export default function AppPage() {
 
   return (
     <TooltipProvider>
-      <div className="page justify-center">
+      <main className="nf-shell">
+        <div className="nf-page space-y-5">
         {/* Rate limit error banner */}
         {isRateLimited && (
           <div className="mx-auto mb-4 w-full max-w-6xl">
@@ -277,21 +348,52 @@ export default function AppPage() {
           </div>
         )}
 
-        <div className="flex justify-center p-2 py-4">
-          <Locator
-            setSelectedPlace={setPlace}
-            handleLocationClick={setUserLocation}
-            value={locationName}
-          />
-        </div>
+        <section className="nf-panel overflow-hidden">
+          <div className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_420px] md:p-5">
+            <div>
+              <div className="nf-section-label">Planner</div>
+              <h1 className="mt-1 text-3xl font-black md:text-4xl">
+                Choose the sky, then choose the place.
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+                Start with a forecast, then move into map scouting when you need
+                viewpoints, phase fit, and recommended places nearby.
+              </p>
+              <div className="mt-4 grid gap-2 text-xs md:grid-cols-3">
+                <WorkflowHint
+                  icon={<Search className="h-4 w-4" />}
+                  label="Search"
+                  value="Pick an area"
+                />
+                <WorkflowHint
+                  icon={<TbSunset2 className="h-4 w-4" />}
+                  label="Forecast"
+                  value="Check the sky"
+                />
+                <WorkflowHint
+                  icon={<Route className="h-4 w-4" />}
+                  label="Scout"
+                  value="Compare spots"
+                />
+              </div>
+            </div>
+            <div className="self-center rounded-md border border-[#d9c8b6] bg-white/70 p-3 dark:border-[#3f3933] dark:bg-white/5">
+              <Locator
+                setSelectedPlace={setPlace}
+                handleLocationClick={setUserLocation}
+                value={locationName}
+              />
+            </div>
+          </div>
+        </section>
 
-        <div className="mx-auto w-full max-w-6xl">
-          <div className="mb-6 grid w-full grid-cols-2 rounded-lg bg-muted p-1">
+        <div className="w-full">
+          <div className="mb-4 grid w-full grid-cols-2 rounded-md border border-[#d9c8b6] bg-[#fffaf2] p-1 dark:border-[#3f3933] dark:bg-[#211f1c]">
             <button
               onClick={() => setActiveTab("predictions")}
-              className={`flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all ${
+              className={`flex items-center justify-center gap-2 rounded px-3 py-2 text-sm font-semibold transition-all ${
                 activeTab === "predictions"
-                  ? "bg-background text-foreground shadow-sm"
+                  ? "bg-[#253f3d] text-white shadow-sm dark:bg-[#f4d2ad] dark:text-[#191714]"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -300,9 +402,9 @@ export default function AppPage() {
             </button>
             <button
               onClick={() => setActiveTab("map")}
-              className={`flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all ${
+              className={`flex items-center justify-center gap-2 rounded px-3 py-2 text-sm font-semibold transition-all ${
                 activeTab === "map"
-                  ? "bg-background text-foreground shadow-sm"
+                  ? "bg-[#253f3d] text-white shadow-sm dark:bg-[#f4d2ad] dark:text-[#191714]"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -320,7 +422,7 @@ export default function AppPage() {
               prediction &&
               prediction.length > 0 ? (
                 <div
-                  className="group grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                  className="group grid gap-3 md:grid-cols-2 lg:grid-cols-3"
                   style={{ alignItems: "center" }}
                 >
                   {prediction.map((entry, i) => (
@@ -356,7 +458,7 @@ export default function AppPage() {
                   ))}
                 </div>
               ) : (
-                <div className="flex h-64 items-center justify-center">
+                <div className="nf-panel flex h-64 items-center justify-center">
                   <div className="text-center text-muted-foreground">
                     <TbSunset2 className="mx-auto mb-4 h-12 w-12 opacity-50" />
                     <p className="text-lg font-medium">
@@ -386,7 +488,7 @@ export default function AppPage() {
                   onLocationChange={handleMapLocationChange}
                 />
               ) : (
-                <div className="flex h-64 items-center justify-center">
+                <div className="nf-panel flex h-64 items-center justify-center">
                   <div className="text-center text-muted-foreground">
                     <MapPin className="mx-auto mb-4 h-12 w-12 opacity-50" />
                     <p className="text-lg font-medium">
@@ -405,10 +507,31 @@ export default function AppPage() {
             </div>
           )}
         </div>
-      </div>
+        </div>
+      </main>
 
       {/* Cache Debugger - Only show in development */}
       {process.env.NODE_ENV === "development" && <CacheDebugger />}
     </TooltipProvider>
+  );
+}
+
+function WorkflowHint({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-[#f5eee5] px-3 py-2 dark:bg-white/10">
+      <span className="text-[#8b3d22] dark:text-[#f0a36d]">{icon}</span>
+      <span>
+        <span className="block font-bold">{label}</span>
+        <span className="text-muted-foreground">{value}</span>
+      </span>
+    </div>
   );
 }
