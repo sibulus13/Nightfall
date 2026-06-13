@@ -1,4 +1,8 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import {
+  clearBrowserLocationPreference,
+  saveBrowserLocationPreference,
+} from "~/lib/browser/locationPersistence";
 import { type Prediction, type ScoreStats } from "../sunset/type";
 import { getSunsetPrediction } from "../sunset/sunset";
 import { aggregateScores } from "../sunset/scoring";
@@ -379,6 +383,7 @@ export const mapSlice = createSlice({
 
       // Save to localStorage
       saveToLocalStorage("sunset-app-last-location", action.payload);
+      saveBrowserLocationPreference(action.payload);
     },
     resetMap: (state) => {
       state.markers = [];
@@ -391,6 +396,7 @@ export const mapSlice = createSlice({
       state.isRateLimited = false;
       state.rateLimitMessage = "";
       state.cachedLocations = [];
+      clearBrowserLocationPreference();
     },
     clearRateLimit: (state) => {
       state.isRateLimited = false;

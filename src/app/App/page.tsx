@@ -19,6 +19,10 @@ import {
 import { useDispatch } from "react-redux";
 import { areCoordinatesEqual } from "~/lib/utils";
 import CacheDebugger from "~/components/CacheDebugger";
+import {
+  readBrowserLocationPreference,
+  saveBrowserLocationPreference,
+} from "~/lib/browser/locationPersistence";
 
 const getScoreGradient = (score: number) => {
   const baseColors = ["from-orange-300 via-pink-400 to-purple-500"];
@@ -107,6 +111,10 @@ function getUrlLocation(): { lat: number; lng: number } | null {
 function hasPersistedLocation(): boolean {
   if (typeof window === "undefined") {
     return false;
+  }
+
+  if (readBrowserLocationPreference()) {
+    return true;
   }
 
   const lat = Number(localStorage.getItem("lat"));
@@ -313,7 +321,11 @@ export default function AppPage() {
         const lat = Number(localStorage.getItem("lat"));
         const lon = Number(localStorage.getItem("lon"));
         if (lat && lon) {
-          setCurrentLocation({ lat, lng: lon });
+          const savedLocation = { lat, lng: lon };
+
+          setCurrentLocation(savedLocation);
+          dispatch(setMapCurrentLocation(savedLocation));
+          saveBrowserLocationPreference(savedLocation);
           // Always fetch predictions for the new location
           predict({ lat, lon }).catch(console.error);
           // Get location name

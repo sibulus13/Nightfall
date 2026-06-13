@@ -1,4 +1,5 @@
 import { useDispatch } from "react-redux";
+import { saveBrowserLocationPreference } from "~/lib/browser/locationPersistence";
 import { getSunsetPrediction } from "~/lib/sunset/sunset";
 import type { Prediction } from "~/lib/sunset/type";
 
@@ -102,6 +103,7 @@ export default function usePrediction() {
             if (cachedData) {
                 localStorage.setItem("lat", lat.toString());
                 localStorage.setItem("lon", lon.toString());
+                saveBrowserLocationPreference({ lat, lng: lon });
                 dispatch({
                     type: "prediction/setPrediction",
                     payload: cachedData,
@@ -116,6 +118,7 @@ export default function usePrediction() {
         // Fetch new data if not cached
         localStorage.setItem("lat", lat.toString());
         localStorage.setItem("lon", lon.toString());
+        saveBrowserLocationPreference({ lat, lng: lon });
         const predictions = await getSunsetPrediction(lat, lon);
 
         // Cache the results
@@ -141,4 +144,3 @@ export default function usePrediction() {
 
     return { predict };
 };
-
