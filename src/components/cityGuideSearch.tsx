@@ -127,7 +127,10 @@ export default function CityGuideSearch() {
   }
 
   return (
-    <section className="border-y border-[#ded0c0] bg-[#fff7ef] dark:border-[#34302b] dark:bg-[#1d1b18]">
+    <section
+      id="city-guide-search"
+      className="scroll-mt-20 border-y border-[#ded0c0] bg-[#fff7ef] dark:border-[#34302b] dark:bg-[#1d1b18]"
+    >
       <div className="mx-auto grid max-w-6xl gap-5 px-4 py-8 lg:grid-cols-[370px_minmax(0,1fr)]">
         <div>
           <div className="nf-section-label">Live city guide</div>

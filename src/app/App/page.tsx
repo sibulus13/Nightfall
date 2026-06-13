@@ -104,6 +104,26 @@ function getUrlLocation(): { lat: number; lng: number } | null {
   return { lat, lng };
 }
 
+function hasPersistedLocation(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const lat = Number(localStorage.getItem("lat"));
+  const lon = Number(localStorage.getItem("lon"));
+
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    lat !== 0 &&
+    lon !== 0 &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lon >= URL_COORDINATE_MIN &&
+    lon <= URL_COORDINATE_MAX
+  );
+}
+
 export default function AppPage() {
   const { predict } = usePrediction();
   const dispatch = useDispatch();
@@ -157,11 +177,17 @@ export default function AppPage() {
   useEffect(() => {
     const savedTab = localStorage.getItem(APP_ACTIVE_TAB_STORAGE_KEY);
     const urlTab = new URLSearchParams(window.location.search).get("tab");
+    const hasLocationContext = Boolean(getUrlLocation()) || hasPersistedLocation();
 
     if (urlTab === "map" || urlTab === "predictions") {
       setActiveTab(urlTab);
-    } else if (savedTab === "map" || savedTab === "predictions") {
+    } else if (
+      hasLocationContext &&
+      (savedTab === "map" || savedTab === "predictions")
+    ) {
       setActiveTab(savedTab);
+    } else {
+      setActiveTab("predictions");
     }
 
     setIsActiveTabHydrated(true);

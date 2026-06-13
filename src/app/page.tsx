@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import {
   Camera,
   Clock,
@@ -17,7 +16,6 @@ import {
 import Locator from "~/components/locator";
 import SunsetAtmosphere from "~/components/sunsetAtmosphere";
 import usePrediction from "~/hooks/usePrediction";
-import { hydrateFromLocalStorage } from "~/lib/map/mapSlice";
 import { getRankedSunsetRegions } from "~/lib/regions/sunsetRegions";
 
 const planningSignals = [
@@ -64,25 +62,7 @@ export default function MainPage() {
   const router = useRouter();
   const dispatch = useDispatch();
   const { predict } = usePrediction();
-  const [isHydrated, setIsHydrated] = useState(false);
   const regions = getRankedSunsetRegions();
-
-  const markers = useSelector(
-    (state: {
-      map: { markers: Array<{ lat: number; lng: number; id: string }> };
-    }) => state.map.markers,
-  );
-
-  useEffect(() => {
-    dispatch(hydrateFromLocalStorage());
-    setIsHydrated(true);
-  }, [dispatch]);
-
-  useEffect(() => {
-    if (isHydrated && markers.length > 0) {
-      router.push("/App");
-    }
-  }, [isHydrated, markers, router]);
 
   function toAppPage() {
     router.push("/App");
@@ -152,7 +132,7 @@ export default function MainPage() {
                 Open planner
               </Link>
               <Link
-                href="/locations/vancouver-bc"
+                href="/locations/vancouver-bc#city-guide-search"
                 className="inline-flex items-center gap-2 rounded-md border border-[#b89f86] bg-white/40 px-4 py-2 text-sm font-semibold text-[#2b241f] hover:bg-white/70 dark:border-[#5c5045] dark:bg-white/5 dark:text-[#f5e8dc] dark:hover:bg-white/10"
               >
                 <Search className="h-4 w-4" />
