@@ -2,6 +2,10 @@ export async function register() {
     if (process.env.NEXT_RUNTIME === 'edge') {
         return
     }
-    const { default: run } = await import('~/lib/mongodb/db')
-    await run().catch(console.dir)
+    try {
+        const { default: run } = await import('~/lib/mongodb/db')
+        await run()
+    } catch (error) {
+        console.error('Mongo instrumentation ping failed:', error)
+    }
 }
