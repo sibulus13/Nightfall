@@ -237,7 +237,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
         return currentSelectedSpotId;
       }
 
-      return candidates[0]?.id ?? null;
+      return null;
     });
   }, []);
 
@@ -354,9 +354,18 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
         // Add new marker if we have less than 5
         dispatch(addMarker({ lat: clickedLat, lng: clickedLng }));
       }
+
+      // Clicking empty map space closes any open spot popup
+      setSelectedSpotId(null);
     },
     [markers, dispatch],
   );
+
+  const toggleSelectedSpot = useCallback((spotId: string) => {
+    setSelectedSpotId((currentSelectedSpotId) =>
+      currentSelectedSpotId === spotId ? null : spotId,
+    );
+  }, []);
 
   const addSpotToMarkers = useCallback(
     (spot: SunsetSpot) => {
@@ -609,7 +618,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
                 <AdvancedMarker
                   key={spot.id}
                   position={{ lat: spot.latitude, lng: spot.longitude }}
-                  onClick={() => setSelectedSpotId(spot.id)}
+                  onClick={() => toggleSelectedSpot(spot.id)}
                 >
                   <SunsetSpotMarker
                     spot={spot}
@@ -653,7 +662,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
             features: [],
           })
         }
-        onSelectSpot={setSelectedSpotId}
+        onSelectSpot={toggleSelectedSpot}
       />
       </div>
     </div>
