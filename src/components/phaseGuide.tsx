@@ -13,12 +13,12 @@ interface PhaseMeta {
   direction: "west" | "east" | null;
 }
 
-/** Chronological order of the sunset sequence — the layout follows real time. */
+/** Chronological order of the sunset sequence — the strip reads left → right as time. */
 const PHASES: PhaseMeta[] = [
   {
     key: "goldenHour",
     label: "Golden hour",
-    when: "≈1 hr before sunset",
+    when: "≈1 hr before",
     blurb: "Warm, low side-light that rakes across the scene. Face west.",
     icon: Sun,
     direction: "west",
@@ -35,8 +35,7 @@ const PHASES: PhaseMeta[] = [
     key: "beltOfVenus",
     label: "Belt of Venus",
     when: "0–20 min after",
-    blurb:
-      "The pink band above the Earth's shadow, opposite the sun. Look east.",
+    blurb: "The pink band above the Earth's shadow, opposite the sun. Look east.",
     icon: Sparkles,
     direction: "east",
   },
@@ -98,55 +97,52 @@ export default function PhaseGuide({
       <header className="mb-3">
         <div className="nf-section-label">The sunset, phase by phase</div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Each phase peaks at a different time and wants a different horizon.
-          Here&apos;s the best nearby spot for each.
+          Each phase peaks at a different time and wants a different horizon —
+          here&apos;s the best nearby spot for each, in order.
         </p>
       </header>
 
-      <ol className="space-y-1">
-        {PHASES.map((phase, index) => {
+      <ol className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {PHASES.map((phase) => {
           const best = bestSpotForPhase(spots, phase.key);
           const Icon = phase.icon;
-          const isLast = index === PHASES.length - 1;
           const bearing = best
             ? bearingForPhase(best.spot, phase.direction)
             : null;
           const isSelected = best?.spot.id === selectedSpotId;
 
           return (
-            <li key={phase.key} className="flex gap-3">
-              {/* Timeline rail */}
-              <div className="flex flex-col items-center">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 via-pink-500 to-violet-600 text-white shadow-sm">
-                  <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+            <li
+              key={phase.key}
+              className="flex h-full flex-col rounded-md border border-border bg-background/50 p-3"
+            >
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 via-pink-500 to-violet-600 text-white shadow-sm">
+                  <Icon className="h-4 w-4" aria-hidden="true" />
                 </span>
-                {!isLast && (
-                  <span className="my-1 w-px flex-1 bg-border" aria-hidden="true" />
-                )}
-              </div>
-
-              {/* Phase content */}
-              <div className={`min-w-0 flex-1 ${isLast ? "" : "pb-3"}`}>
-                <div className="flex items-baseline justify-between gap-2">
-                  <h4 className="text-base font-semibold text-foreground">
+                <div className="min-w-0">
+                  <h4 className="truncate text-sm font-semibold text-foreground">
                     {phase.label}
                   </h4>
-                  <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                  <div className="text-xs text-muted-foreground">
                     {phase.when}
-                  </span>
+                  </div>
                 </div>
-                <p className="mt-0.5 text-sm leading-6 text-muted-foreground">
-                  {phase.blurb}
-                </p>
+              </div>
 
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {phase.blurb}
+              </p>
+
+              <div className="mt-auto pt-3">
                 {best ? (
                   <button
                     type="button"
                     onClick={() => onSelectSpot(best.spot.id)}
-                    className={`mt-2 flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition-colors ${
+                    className={`flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-left transition-colors ${
                       isSelected
                         ? "border-[#a6532d] bg-[#fff4e8] dark:bg-[#33241d]"
-                        : "border-border bg-background/60 hover:bg-muted"
+                        : "border-border bg-card hover:bg-muted"
                     }`}
                     title={`Show ${best.spot.name} on the map`}
                   >
@@ -165,8 +161,8 @@ export default function PhaseGuide({
                     </span>
                   </button>
                 ) : (
-                  <p className="mt-2 rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
-                    No spots scouted here yet.
+                  <p className="rounded-md border border-dashed border-border px-2.5 py-2 text-xs text-muted-foreground">
+                    No spots scouted yet.
                   </p>
                 )}
               </div>
