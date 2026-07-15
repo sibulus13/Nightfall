@@ -47,6 +47,10 @@ export async function fetchOverpassSunsetCandidates(
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      // Overpass rejects UA-less requests with 406; without this the app
+      // silently fell back to the BC-only validated list everywhere.
+      "User-Agent": "Nightfalls-Sunset/1.0 (+https://nightfalls.app)",
+      Accept: "application/json",
     },
     body: new URLSearchParams({
       data: buildOverpassQuery(
