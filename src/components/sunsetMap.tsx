@@ -29,6 +29,7 @@ import {
   Binoculars,
   Camera,
   ChevronDown,
+  Cloud,
   Footprints,
   Landmark,
   Loader2,
@@ -41,6 +42,7 @@ import {
   Waves,
 } from "lucide-react";
 import CelestialIndicators from "./celestialIndicators";
+import CloudOverlay from "./cloudOverlay";
 import type { SunsetSpot, SunsetSpotResponse } from "~/types/sunsetSpot";
 
 interface SunsetMapProps {
@@ -89,6 +91,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   const [center, setCenter] = useState(initialLocation);
   const [queryCenter, setQueryCenter] = useState(initialLocation);
   const [currentZoom, setCurrentZoom] = useState(zoomLevel);
+  const [showClouds, setShowClouds] = useState(true);
   const [sunsetSpots, setSunsetSpots] = useState<SunsetSpot[]>([]);
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
   const [isLoadingSpots, setIsLoadingSpots] = useState(false);
@@ -211,6 +214,18 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     }
     return undefined;
   }, [markers, dateOptions, selectedDayIndex, getPredictionForSelectedDay]);
+
+  // Sunset time (unix seconds) for the selected day, used to time the cloud
+  // overlay's OWM forecast tiles. Undefined when no prediction is available.
+  const sunsetUnixForSelectedDay = useMemo(() => {
+    const sunsetTime = getSunsetTimeForSelectedDay();
+    if (!sunsetTime) {
+      return undefined;
+    }
+
+    const unixMs = new Date(sunsetTime).getTime();
+    return Number.isNaN(unixMs) ? undefined : Math.floor(unixMs / 1000);
+  }, [getSunsetTimeForSelectedDay]);
 
   // Update center when initialLocation changes
   useEffect(() => {
@@ -483,6 +498,22 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
 
           {/* Action Buttons - Right Side */}
           <div className="flex items-center gap-2">
+            {/* Cloud overlay toggle */}
+            <Button
+              onClick={() => setShowClouds((current) => !current)}
+              variant={showClouds ? "default" : "outline"}
+              size="sm"
+              className="flex items-center gap-2"
+              title={
+                showClouds
+                  ? "Hide sunset-timed cloud coverage"
+                  : "Show sunset-timed cloud coverage"
+              }
+            >
+              <Cloud className="h-4 w-4" />
+              Clouds
+            </Button>
+
             <Button
               onClick={handleGeneratePredictions}
               disabled={markers.length === 0 || isCalculating}
@@ -512,6 +543,15 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
             )}
           </div>
         </div>
+
+        {/* Cloud overlay legend */}
+        {showClouds && (
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Cloud className="h-3.5 w-3.5" />
+            Cloud coverage shaded for the selected day&apos;s sunset hour
+            (darker = more cloud).
+          </p>
+        )}
       </div>
 
       {/* Aggregate banner — visible once ≥2 markers have predictions */}
@@ -536,6 +576,12 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
             clickableIcons={false}
             disableDoubleClickZoom={true}
           >
+            {/* Sunset-timed cloud coverage overlay */}
+            <CloudOverlay
+              visible={showClouds}
+              date={sunsetUnixForSelectedDay}
+            />
+
             {markers.map((marker, index) => {
               const prediction = getPredictionForSelectedDay(marker.id);
               const markerNumber = index + 1;
@@ -595,6 +641,13 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
                       filter: `saturate(${gradient.saturation}%)`,
                     }}
                   />
+
+                  {/* Cloud-quality sub-score caption */}
+                  {prediction && (
+                    <div className="pointer-events-none absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/90 px-1.5 py-0.5 text-[8px] font-semibold leading-none text-[#5d3028] shadow-sm dark:bg-black/70 dark:text-[#f3d4ca]">
+                      Cloud quality {Math.round(prediction.scores.cloudCoverage)}
+                    </div>
+                  )}
                 </div>
               );
 
