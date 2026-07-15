@@ -44,6 +44,12 @@ const OPEN_METEO_ELEVATION_URL = "https://api.open-meteo.com/v1/elevation";
 const MAX_COORDS_PER_REQUEST = 100;
 const FETCH_TIMEOUT_MS = 8000;
 
+// Retry knobs for transient Open-Meteo failures (rate limits, aborts, blips).
+// The outer enrichCandidatesWithTerrain still degrades gracefully on final
+// failure; this just reduces how often it has to.
+const ELEVATION_MAX_ATTEMPTS = 3;
+const ELEVATION_BACKOFF_MS = [500, 1500] as const;
+
 interface CandidateLayout {
   observerIndex: number;
   westStartIndex: number;
@@ -179,6 +185,24 @@ async function fetchElevations(coordinates: Coordinate[]): Promise<number[]> {
     const longitudes = chunk.map((c) => c.longitude.toFixed(6)).join(",");
     const url = `${OPEN_METEO_ELEVATION_URL}?latitude=${latitudes}&longitude=${longitudes}`;
 
+    elevations.push(...(await fetchElevationChunk(url, chunk.length)));
+  }
+
+  return elevations;
+}
+
+/**
+ * Fetch one coordinate chunk with a per-request AbortController timeout and
+ * exponential-backoff retries on any transient failure (non-ok, abort, or an
+ * unexpected body). Throws the last error once retries are exhausted.
+ */
+async function fetchElevationChunk(
+  url: string,
+  expectedLength: number,
+): Promise<number[]> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < ELEVATION_MAX_ATTEMPTS; attempt++) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
@@ -187,16 +211,28 @@ async function fetchElevations(coordinates: Coordinate[]): Promise<number[]> {
         throw new Error(`Elevation API error: ${response.status}`);
       }
       const data = (await response.json()) as { elevation?: number[] };
-      if (!data.elevation || data.elevation.length !== chunk.length) {
+      if (!data.elevation || data.elevation.length !== expectedLength) {
         throw new Error("Elevation API returned an unexpected shape");
       }
-      elevations.push(...data.elevation);
+      return data.elevation;
+    } catch (error) {
+      lastError = error;
+      const backoffMs = ELEVATION_BACKOFF_MS[attempt];
+      if (backoffMs !== undefined) {
+        await delay(backoffMs);
+      }
     } finally {
       clearTimeout(timeout);
     }
   }
 
-  return elevations;
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Elevation request failed");
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function getSunsetAzimuthDegrees(origin: Coordinate): number {

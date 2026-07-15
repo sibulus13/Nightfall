@@ -5,10 +5,25 @@ import type {
   SunsetLocationCandidate,
 } from "./types";
 
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+// Primary endpoint first; mirrors are tried in order only after the primary
+// exhausts its retries. All are hit with identical headers (incl. User-Agent).
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+] as const;
 const DEFAULT_DISCOVERY_LIMIT = 50;
 const OSM_TIMEOUT_SECONDS = 8;
 const UNKNOWN_REGION: DiscoveryRegion = "unknown";
+
+// Resilience knobs. The server-side `[timeout:8]` in the query only bounds
+// Overpass' own execution; CLIENT_TIMEOUT_MS bounds our socket so a hung
+// connection can't stall the request handler.
+const MAX_ATTEMPTS = 3;
+const RETRY_BACKOFF_MS = [500, 1500] as const;
+const CLIENT_TIMEOUT_MS = 10_000;
+// Transient statuses worth retrying; 400/404 are deterministic client errors.
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 
 interface OverpassElement {
   type: "node" | "way" | "relation";
@@ -43,43 +58,98 @@ export async function fetchOverpassSunsetCandidates(
   limit = DEFAULT_DISCOVERY_LIMIT,
   passName: DiscoveryPassName = "high-confidence",
 ): Promise<SunsetLocationCandidate[]> {
-  const response = await fetch(OVERPASS_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-      // Overpass rejects UA-less requests with 406; without this the app
-      // silently fell back to the BC-only validated list everywhere.
-      "User-Agent": "Nightfalls-Sunset/1.0 (+https://nightfalls.app)",
-      Accept: "application/json",
-    },
-    body: new URLSearchParams({
-      data: buildOverpassQuery(
-        latitude,
-        longitude,
-        radiusMeters,
-        limit,
-        passName,
-      ),
-    }),
-    next: {
-      revalidate: 60 * 60 * 24,
-    },
+  const body = new URLSearchParams({
+    data: buildOverpassQuery(latitude, longitude, radiusMeters, limit, passName),
   });
 
-  if (!response.ok) {
-    throw new OverpassRequestError(
-      `Overpass request failed with status ${response.status}`,
-      response.status,
-    );
+  let lastError: unknown;
+
+  for (const url of OVERPASS_ENDPOINTS) {
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      try {
+        return await fetchOverpassOnce(url, body);
+      } catch (error) {
+        lastError = error;
+
+        // Deterministic client errors (400/404) won't be fixed by retrying or
+        // by a mirror — the query itself is wrong. Fail fast.
+        if (
+          error instanceof OverpassRequestError &&
+          !RETRYABLE_STATUS.has(error.status)
+        ) {
+          throw error;
+        }
+
+        const backoffMs = RETRY_BACKOFF_MS[attempt];
+        if (backoffMs !== undefined) {
+          await delay(backoffMs);
+        }
+      }
+    }
+    // Retries exhausted on this endpoint → fall through to the next mirror.
   }
 
-  const data = (await response.json()) as OverpassResponse;
+  if (lastError instanceof OverpassRequestError) {
+    throw lastError;
+  }
+  throw new OverpassRequestError(
+    `Overpass request failed: ${
+      lastError instanceof Error ? lastError.message : String(lastError)
+    }`,
+    0,
+  );
+}
 
-  return (data.elements ?? [])
-    .map(mapOverpassElementToCandidate)
-    .filter(
-      (candidate): candidate is SunsetLocationCandidate => candidate !== null,
-    );
+/**
+ * A single Overpass request against one endpoint: bounded by a client-side
+ * AbortController timeout, non-ok → OverpassRequestError (so the caller can
+ * inspect status and decide retryability), then parsed into candidates.
+ */
+async function fetchOverpassOnce(
+  url: string,
+  body: URLSearchParams,
+): Promise<SunsetLocationCandidate[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        // Overpass rejects UA-less requests with 406; without this the app
+        // silently fell back to the BC-only validated list everywhere.
+        "User-Agent": "Nightfalls-Sunset/1.0 (+https://nightfalls.app)",
+        Accept: "application/json",
+      },
+      body,
+      signal: controller.signal,
+      next: {
+        revalidate: 60 * 60 * 24,
+      },
+    });
+
+    if (!response.ok) {
+      throw new OverpassRequestError(
+        `Overpass request failed with status ${response.status}`,
+        response.status,
+      );
+    }
+
+    const data = (await response.json()) as OverpassResponse;
+
+    return (data.elements ?? [])
+      .map(mapOverpassElementToCandidate)
+      .filter(
+        (candidate): candidate is SunsetLocationCandidate => candidate !== null,
+      );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function buildOverpassQuery(
