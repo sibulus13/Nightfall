@@ -93,7 +93,7 @@ export default function PhaseGuide({
   onSelectSpot: (spotId: string) => void;
 }) {
   return (
-    <section className="nf-panel p-4">
+    <section className="nf-panel p-3">
       <header className="mb-3">
         <div className="nf-section-label">The sunset, phase by phase</div>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -102,7 +102,7 @@ export default function PhaseGuide({
         </p>
       </header>
 
-      <ol className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <ol className="flex gap-3 overflow-x-auto pb-1 lg:flex-col lg:overflow-x-visible lg:pb-0">
         {PHASES.map((phase) => {
           const best = bestSpotForPhase(spots, phase.key);
           const Icon = phase.icon;
@@ -114,7 +114,7 @@ export default function PhaseGuide({
           return (
             <li
               key={phase.key}
-              className="flex h-full flex-col rounded-md border border-border bg-background/50 p-3"
+              className="flex min-w-[80%] shrink-0 flex-col rounded-md border border-border bg-background/50 p-3 sm:min-w-[260px] lg:w-full lg:min-w-0 lg:shrink"
             >
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 via-pink-500 to-violet-600 text-white shadow-sm">
