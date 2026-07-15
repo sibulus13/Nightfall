@@ -439,22 +439,14 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   }, []);
 
   return (
-    <div className="space-y-4">
-      {/* Inputs (control header) + Map (output): one framed unit */}
-      <div className="nf-panel overflow-hidden">
-      <div className="border-b border-[#d9c8b6] p-3 dark:border-[#3f3933]">
-        <div className="text-sm text-muted-foreground">
-          <p>
-            Click on the map to place markers (up to 5). Click on existing
-            markers to remove them.
-          </p>
-          <p className="mt-1">Markers placed: {markers.length}/5</p>
-        </div>
-
-        {/* Controls Row - Date Selector Left, Action Buttons Right */}
-        <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          {/* Day Selector - Left Side */}
-          <div className="flex items-center">
+    <div className="flex flex-col gap-4 lg:grid lg:h-[calc(100vh-6rem)] lg:grid-cols-[minmax(0,1fr)_400px] lg:grid-rows-[minmax(0,1fr)] lg:gap-4 lg:overflow-hidden">
+      {/* RIGHT RAIL — DOM-first so selectables sit ABOVE the map on mobile; moves to the right column on desktop. Scrolls internally so the outer frame stays one viewport. */}
+      <div className="flex min-h-0 flex-col gap-3 lg:order-2 lg:h-full lg:overflow-y-auto lg:pr-1">
+        {/* Compact controls (markers / day / Predict / Clear) */}
+        <div className="nf-panel p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {/* Day Selector */}
+            <div className="flex items-center">
             {dateOptions.length > 0 ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -514,11 +506,51 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
               </Button>
             )}
           </div>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Tap the map to place markers (up to 5); tap a marker to remove it ·{" "}
+            {markers.length}/5 placed
+          </p>
         </div>
+
+        {/* Aggregate banner — once ≥2 markers have predictions */}
+        {dayStats && <DayStatsBanner stats={dayStats} />}
+
+        {/* Phase recommendations (output) */}
+        <PhaseGuide
+          spots={sunsetSpots}
+          selectedSpotId={selectedSpotId}
+          onSelectSpot={toggleSelectedSpot}
+        />
+
+        {/* Browse all nearby spots + filters */}
+        <SunsetSpotsPanel
+          spots={filteredSunsetSpots}
+          availableFilters={availableSpotFilters}
+          activeFilters={activeSpotFilters}
+          selectedSpotId={selectedSpotId}
+          isLoading={isLoadingSpots}
+          source={spotSource}
+          error={spotError}
+          onToggleFilter={(group, value) => {
+            setActiveSpotFilters((currentFilters) =>
+              toggleSpotFilter(currentFilters, group, value),
+            );
+          }}
+          onClearFilters={() =>
+            setActiveSpotFilters({
+              phases: [],
+              locationTypes: [],
+              features: [],
+            })
+          }
+          onSelectSpot={toggleSelectedSpot}
+        />
       </div>
 
-        {/* Map (output) — full width */}
-        <div className="relative h-[480px] bg-[#fffaf2] dark:bg-[#211f1c] sm:h-[560px] lg:h-[620px]">
+      {/* MAP (output) — main column on desktop (h-full), below the rail on mobile */}
+      <div className="nf-panel overflow-hidden lg:order-1 lg:h-full">
+        <div className="relative h-[52vh] min-h-[320px] bg-[#fffaf2] dark:bg-[#211f1c] lg:h-full">
         <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""}>
           <Map
             style={mapContainerStyle}
@@ -639,42 +671,8 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
             sunsetTime={getSunsetTimeForSelectedDay()}
           />
         )}
+        </div>
       </div>
-      </div>
-
-      {/* Aggregate banner — once ≥2 markers have predictions */}
-      {dayStats && <DayStatsBanner stats={dayStats} />}
-
-      {/* Phase recommendations (output) — horizontal timeline strip */}
-      <PhaseGuide
-        spots={sunsetSpots}
-        selectedSpotId={selectedSpotId}
-        onSelectSpot={toggleSelectedSpot}
-      />
-
-      {/* Browse all nearby spots + filters */}
-      <SunsetSpotsPanel
-        spots={filteredSunsetSpots}
-        availableFilters={availableSpotFilters}
-        activeFilters={activeSpotFilters}
-        selectedSpotId={selectedSpotId}
-        isLoading={isLoadingSpots}
-        source={spotSource}
-        error={spotError}
-        onToggleFilter={(group, value) => {
-          setActiveSpotFilters((currentFilters) =>
-            toggleSpotFilter(currentFilters, group, value),
-          );
-        }}
-        onClearFilters={() =>
-          setActiveSpotFilters({
-            phases: [],
-            locationTypes: [],
-            features: [],
-          })
-        }
-        onSelectSpot={toggleSelectedSpot}
-      />
     </div>
   );
 };
