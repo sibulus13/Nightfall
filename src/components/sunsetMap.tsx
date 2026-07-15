@@ -41,6 +41,8 @@ import {
   Waves,
 } from "lucide-react";
 import CelestialIndicators from "./celestialIndicators";
+import PhaseGuide from "./phaseGuide";
+import { bearingToCompass } from "~/lib/sunset/bearing";
 import type { SunsetSpot, SunsetSpotResponse } from "~/types/sunsetSpot";
 
 interface SunsetMapProps {
@@ -642,28 +644,35 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
         )}
       </div>
 
-      <SunsetSpotsPanel
-        spots={filteredSunsetSpots}
-        availableFilters={availableSpotFilters}
-        activeFilters={activeSpotFilters}
-        selectedSpotId={selectedSpotId}
-        isLoading={isLoadingSpots}
-        source={spotSource}
-        error={spotError}
-        onToggleFilter={(group, value) => {
-          setActiveSpotFilters((currentFilters) =>
-            toggleSpotFilter(currentFilters, group, value),
-          );
-        }}
-        onClearFilters={() =>
-          setActiveSpotFilters({
-            phases: [],
-            locationTypes: [],
-            features: [],
-          })
-        }
-        onSelectSpot={toggleSelectedSpot}
-      />
+      <div className="space-y-4">
+        <PhaseGuide
+          spots={sunsetSpots}
+          selectedSpotId={selectedSpotId}
+          onSelectSpot={toggleSelectedSpot}
+        />
+        <SunsetSpotsPanel
+          spots={filteredSunsetSpots}
+          availableFilters={availableSpotFilters}
+          activeFilters={activeSpotFilters}
+          selectedSpotId={selectedSpotId}
+          isLoading={isLoadingSpots}
+          source={spotSource}
+          error={spotError}
+          onToggleFilter={(group, value) => {
+            setActiveSpotFilters((currentFilters) =>
+              toggleSpotFilter(currentFilters, group, value),
+            );
+          }}
+          onClearFilters={() =>
+            setActiveSpotFilters({
+              phases: [],
+              locationTypes: [],
+              features: [],
+            })
+          }
+          onSelectSpot={toggleSelectedSpot}
+        />
+      </div>
       </div>
     </div>
   );
@@ -723,7 +732,7 @@ function SunsetSpotMarker({
               {visibleBadges.map((badge) => (
                 <span
                   key={badge}
-                  className="rounded-full bg-[#f2dfd5] px-2 py-0.5 text-[10px] font-semibold text-[#5d3028] dark:bg-white/10 dark:text-[#f3d4ca]"
+                  className="rounded-full bg-[#f2dfd5] px-2 py-0.5 text-xs font-semibold text-[#5d3028] dark:bg-white/10 dark:text-[#f3d4ca]"
                 >
                   {badge}
                 </span>
@@ -738,21 +747,17 @@ function SunsetSpotMarker({
           {/* Belt of Venus suitability — anti-solar (eastern) rose arch */}
           <div className="mt-2 rounded-md border border-pink-200/70 bg-pink-50/70 p-2 dark:border-pink-400/25 dark:bg-pink-400/10">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold text-pink-700 dark:text-pink-300">
+              <span className="text-xs font-semibold text-pink-700 dark:text-pink-300">
                 Belt of Venus
               </span>
-              <span className="text-[11px] font-semibold text-pink-700 dark:text-pink-300">
+              <span className="text-xs font-semibold text-pink-700 dark:text-pink-300">
                 {Math.round(spot.phaseScores.beltOfVenus)}/100
               </span>
             </div>
-            <div className="mt-0.5 text-[11px] text-[#7a4a3c] dark:text-[#f0c2b0]">
-              Look{" "}
-              {bearingToCompass(
-                spot.viewingDirections.antisolarAzimuthDegrees,
-              )}{" "}
-              ({Math.round(spot.viewingDirections.antisolarAzimuthDegrees)}°)
+            <div className="mt-0.5 text-xs text-[#7a4a3c] dark:text-[#f0c2b0]">
+              Look {bearingToCompass(spot.viewingDirections.antisolarAzimuthDegrees)}
             </div>
-            <div className="mt-1 text-[10px] leading-snug text-[#8a6a5c] dark:text-[#d9b3a6]">
+            <div className="mt-1 text-xs leading-snug text-[#8a6a5c] dark:text-[#d9b3a6]">
               The rosy arch appears opposite the sunset — wants a clear eastern
               horizon.
             </div>
@@ -818,40 +823,9 @@ function SunsetSpotsPanel({
         {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
 
-      {/* Quick shortcut into the existing Belt-of-Venus phase filter */}
-      <div className="mb-3">
-        <button
-          type="button"
-          onClick={() =>
-            onToggleFilter("phases", BELT_OF_VENUS_PHASE_FILTER)
-          }
-          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-            activeFilters.phases.includes(BELT_OF_VENUS_PHASE_FILTER)
-              ? "border-pink-400 bg-pink-500/15 text-pink-700 dark:text-pink-300"
-              : "border-pink-300/70 bg-pink-50/60 text-pink-600 hover:bg-pink-100/70 dark:border-pink-400/25 dark:bg-pink-400/10 dark:text-pink-300"
-          }`}
-          title="Rank spots by their eastern anti-solar (Belt of Venus) view"
-        >
-          <span className="h-2 w-2 rounded-full bg-pink-400" aria-hidden="true" />
-          Best for Belt of Venus
-        </button>
-        <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
-          The pink anti-twilight arch appears opposite the sunset — needs a clear
-          view to the east.
-        </p>
-      </div>
-
-      {(availableFilters.phases.length > 0 ||
-        availableFilters.locationTypes.length > 0 ||
+      {(availableFilters.locationTypes.length > 0 ||
         availableFilters.features.length > 0) && (
         <div className="mb-3 space-y-2">
-          <SpotFilterSection
-            title="Sunset phase"
-            group="phases"
-            options={availableFilters.phases}
-            activeOptions={activeFilters.phases}
-            onToggleFilter={onToggleFilter}
-          />
           <SpotFilterSection
             title="Location type"
             group="locationTypes"
@@ -871,7 +845,7 @@ function SunsetSpotsPanel({
               <button
                 type="button"
                 onClick={onClearFilters}
-                className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground"
+                className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
               >
                 Clear filters
               </button>
@@ -924,7 +898,7 @@ function SunsetSpotsPanel({
                   </span>
                 </span>
                 <span
-                  className="shrink-0 rounded-full border border-[#e3c5b4] bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-[#6f3a28] dark:border-white/10 dark:bg-white/10 dark:text-[#f0c2b0]"
+                  className="shrink-0 rounded-full border border-[#e3c5b4] bg-white/70 px-2 py-0.5 text-xs font-semibold text-[#6f3a28] dark:border-white/10 dark:bg-white/10 dark:text-[#f0c2b0]"
                   aria-hidden="true"
                 >
                   map
@@ -1002,7 +976,7 @@ function SpotFilterSection({
 
   return (
     <div>
-      <div className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">
+      <div className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
         {title}
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -1014,7 +988,7 @@ function SpotFilterSection({
               key={option}
               type="button"
               onClick={() => onToggleFilter(group, option)}
-              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${
+              className={`rounded-full border px-2 py-0.5 text-xs font-medium transition-colors ${
                   isActive
                     ? "border-[#a6532d] bg-[#efe1d1] text-[#3d3128] dark:bg-[#4b3326] dark:text-[#f7e4d4]"
                     : "border-[#d9c8b6] bg-white/60 text-muted-foreground hover:text-foreground dark:border-[#3f3933] dark:bg-white/5"
@@ -1207,28 +1181,6 @@ function getPhaseLabel(phase: SunsetSpot["bestPhase"]): string {
   return labels[phase];
 }
 
-// Normalized phase-filter value for Belt of Venus, matching the value produced
-// by getSpotPhaseFilters -> normalizeFilterLabel(getPhaseLabel("beltOfVenus")).
-// Reused by the one-click "Best for Belt of Venus" quick-filter chip so it wires
-// into the existing phase-filter plumbing rather than a parallel system.
-const BELT_OF_VENUS_PHASE_FILTER = normalizeFilterLabel(
-  getPhaseLabel("beltOfVenus"),
-);
-
-// Convert a compass bearing in degrees to a 16-point compass label
-// (e.g. 75 -> "ENE"). Used to render a spot's anti-solar viewing direction.
-function bearingToCompass(deg: number): string {
-  const points = [
-    "N", "NNE", "NE", "ENE",
-    "E", "ESE", "SE", "SSE",
-    "S", "SSW", "SW", "WSW",
-    "W", "WNW", "NW", "NNW",
-  ];
-  const normalized = ((deg % 360) + 360) % 360;
-  const index = Math.round(normalized / 22.5) % 16;
-  return points[index] ?? "N";
-}
-
 function getSpotMarkerIcon(spot: SunsetSpot): typeof Camera {
   const searchableText = [
     spot.kind,
@@ -1358,7 +1310,7 @@ function DayStatsBanner({ stats }: { stats: ScoreStats }) {
           style={{ left: `${stats.mean}%` }}
         />
       </div>
-      <div className="mt-1 flex justify-between text-[10px] text-white/40">
+      <div className="mt-1 flex justify-between text-xs text-white/40">
         <span>0</span>
         <span>50</span>
         <span>100</span>
