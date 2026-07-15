@@ -5,6 +5,7 @@ import {
   OverpassRequestError,
 } from "./overpass";
 import { rankSunsetLocation } from "./ranking";
+import { enrichCandidatesWithTerrain } from "./terrain";
 import {
   getNearbyValidatedCandidates,
   mergeValidatedReferences,
@@ -75,7 +76,9 @@ export async function discoverSunsetLocations(
       mergeValidatedReferences,
     ),
   );
-  const candidates = enrichedCandidates
+  const terrainEnrichedCandidates =
+    await enrichCandidatesWithTerrain(enrichedCandidates);
+  const candidates = terrainEnrichedCandidates
     .map(rankSunsetLocation)
     .filter((candidate) => candidate.publicAccess)
     .sort((a, b) => {
