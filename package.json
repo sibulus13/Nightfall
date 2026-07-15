@@ -7,6 +7,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
+    "test": "vitest run",
     "setup:neon": "node scripts/setup-neon.mjs",
     "start": "next start"
   },
@@ -59,7 +60,8 @@
     "prettier": "^3.3.2",
     "prettier-plugin-tailwindcss": "^0.6.5",
     "tailwindcss": "^3.4.3",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "vitest": "^4.1.10"
   },
   "ct3aMetadata": {
     "initVersion": "7.37.0"
