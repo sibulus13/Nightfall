@@ -735,6 +735,29 @@ function SunsetSpotMarker({
             Arrive by {formatSpotTime(spot.goldenHour.arriveBy)}
           </div>
 
+          {/* Belt of Venus suitability — anti-solar (eastern) rose arch */}
+          <div className="mt-2 rounded-md border border-pink-200/70 bg-pink-50/70 p-2 dark:border-pink-400/25 dark:bg-pink-400/10">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-semibold text-pink-700 dark:text-pink-300">
+                Belt of Venus
+              </span>
+              <span className="text-[11px] font-semibold text-pink-700 dark:text-pink-300">
+                {Math.round(spot.phaseScores.beltOfVenus)}/100
+              </span>
+            </div>
+            <div className="mt-0.5 text-[11px] text-[#7a4a3c] dark:text-[#f0c2b0]">
+              Look{" "}
+              {bearingToCompass(
+                spot.viewingDirections.antisolarAzimuthDegrees,
+              )}{" "}
+              ({Math.round(spot.viewingDirections.antisolarAzimuthDegrees)}°)
+            </div>
+            <div className="mt-1 text-[10px] leading-snug text-[#8a6a5c] dark:text-[#d9b3a6]">
+              The rosy arch appears opposite the sunset — wants a clear eastern
+              horizon.
+            </div>
+          </div>
+
           <button
             type="button"
             disabled={!canAddMarker}
@@ -793,6 +816,29 @@ function SunsetSpotsPanel({
           </p>
         </div>
         {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+      </div>
+
+      {/* Quick shortcut into the existing Belt-of-Venus phase filter */}
+      <div className="mb-3">
+        <button
+          type="button"
+          onClick={() =>
+            onToggleFilter("phases", BELT_OF_VENUS_PHASE_FILTER)
+          }
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+            activeFilters.phases.includes(BELT_OF_VENUS_PHASE_FILTER)
+              ? "border-pink-400 bg-pink-500/15 text-pink-700 dark:text-pink-300"
+              : "border-pink-300/70 bg-pink-50/60 text-pink-600 hover:bg-pink-100/70 dark:border-pink-400/25 dark:bg-pink-400/10 dark:text-pink-300"
+          }`}
+          title="Rank spots by their eastern anti-solar (Belt of Venus) view"
+        >
+          <span className="h-2 w-2 rounded-full bg-pink-400" aria-hidden="true" />
+          Best for Belt of Venus
+        </button>
+        <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+          The pink anti-twilight arch appears opposite the sunset — needs a clear
+          view to the east.
+        </p>
       </div>
 
       {(availableFilters.phases.length > 0 ||
@@ -1159,6 +1205,28 @@ function getPhaseLabel(phase: SunsetSpot["bestPhase"]): string {
   };
 
   return labels[phase];
+}
+
+// Normalized phase-filter value for Belt of Venus, matching the value produced
+// by getSpotPhaseFilters -> normalizeFilterLabel(getPhaseLabel("beltOfVenus")).
+// Reused by the one-click "Best for Belt of Venus" quick-filter chip so it wires
+// into the existing phase-filter plumbing rather than a parallel system.
+const BELT_OF_VENUS_PHASE_FILTER = normalizeFilterLabel(
+  getPhaseLabel("beltOfVenus"),
+);
+
+// Convert a compass bearing in degrees to a 16-point compass label
+// (e.g. 75 -> "ENE"). Used to render a spot's anti-solar viewing direction.
+function bearingToCompass(deg: number): string {
+  const points = [
+    "N", "NNE", "NE", "ENE",
+    "E", "ESE", "SE", "SSE",
+    "S", "SSW", "SW", "WSW",
+    "W", "WNW", "NW", "NNW",
+  ];
+  const normalized = ((deg % 360) + 360) % 360;
+  const index = Math.round(normalized / 22.5) % 16;
+  return points[index] ?? "N";
 }
 
 function getSpotMarkerIcon(spot: SunsetSpot): typeof Camera {
