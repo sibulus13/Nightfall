@@ -415,13 +415,14 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   const onBoundsChanged = useCallback(
     (event: MapCameraChangedEvent) => {
       const nextZoom = event.detail.zoom;
+      // Keep the RAW longitude for the map's own state so the controlled center
+      // matches where the user actually dragged (normalizing here snapped the
+      // map back and broke panning). Longitude is wrapped into [-180,180] only
+      // at the API boundaries (spots fetch + geocode).
       const nextCenter = event.detail.center
         ? {
             lat: event.detail.center.lat,
-            // Google Maps can report a longitude outside [-180, 180] after the
-            // user pans across/around the globe (e.g. 237 = -123 + 360). Wrap it
-            // back into range so the API (and geocoder) don't 400 on it.
-            lng: normalizeLongitude(event.detail.center.lng),
+            lng: event.detail.center.lng,
           }
         : null;
 

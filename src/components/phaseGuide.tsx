@@ -114,15 +114,17 @@ export default function PhaseGuide({
         </p>
       </header>
 
-      {isLoading && spots.length === 0 ? (
-        <div className="space-y-3">
+      {isLoading && (
+        <div className="mb-3 space-y-2">
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             Finding the best sunset spots nearby…
           </div>
           <div className="nf-sunset-band animate-pulse" aria-hidden="true" />
-          <PhaseGuideSkeleton />
         </div>
+      )}
+      {isLoading && spots.length === 0 ? (
+        <PhaseGuideSkeleton />
       ) : (
       <ol
         className={`flex gap-3 overflow-x-auto pb-1 transition-opacity lg:flex-col lg:overflow-x-visible lg:pb-0 ${
