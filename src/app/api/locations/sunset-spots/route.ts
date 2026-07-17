@@ -12,6 +12,9 @@ export async function GET(request: NextRequest) {
     searchParams.get("radiusMeters") ?? DEFAULT_RADIUS_METERS,
   );
   const limit = Number(searchParams.get("limit") ?? DEFAULT_LIMIT);
+  // Progressive loading: `terrain=false` skips the slower terrain enrichment
+  // for an instant first paint; the client follows up with the full request.
+  const includeTerrain = searchParams.get("terrain") !== "false";
 
   if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
     return Response.json(
@@ -25,6 +28,7 @@ export async function GET(request: NextRequest) {
     longitude,
     radiusMeters,
     limit,
+    includeTerrain,
   });
 
   return Response.json(result);

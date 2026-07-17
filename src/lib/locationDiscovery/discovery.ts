@@ -35,6 +35,12 @@ const discoveryCache = new Map<
 export interface DiscoverSunsetLocationsOptions extends Coordinate {
   radiusMeters?: number;
   limit?: number;
+  /**
+   * When false, skip the (slower) terrain enrichment and rank on keyword
+   * heuristics only. Used for the progressive first paint — the client fetches
+   * `terrain=false` for an instant result, then `terrain=true` to refine.
+   */
+  includeTerrain?: boolean;
 }
 
 export interface DiscoverSunsetLocationsResult {
@@ -51,11 +57,17 @@ export async function discoverSunsetLocations(
 ): Promise<DiscoverSunsetLocationsResult> {
   const radiusMeters = clampRadius(options.radiusMeters);
   const limit = clampLimit(options.limit);
+  const includeTerrain = options.includeTerrain !== false;
   const center = {
     latitude: options.latitude,
     longitude: options.longitude,
   };
-  const cacheKey = getDiscoveryCacheKey(center, radiusMeters, limit);
+  const cacheKey = getDiscoveryCacheKey(
+    center,
+    radiusMeters,
+    limit,
+    includeTerrain,
+  );
   const cachedResult = discoveryCache.get(cacheKey);
 
   if (cachedResult && cachedResult.expiresAt > Date.now()) {
@@ -76,8 +88,9 @@ export async function discoverSunsetLocations(
       mergeValidatedReferences,
     ),
   );
-  const terrainEnrichedCandidates =
-    await enrichCandidatesWithTerrain(enrichedCandidates);
+  const terrainEnrichedCandidates = includeTerrain
+    ? await enrichCandidatesWithTerrain(enrichedCandidates)
+    : enrichedCandidates;
   const candidates = terrainEnrichedCandidates
     .map(rankSunsetLocation)
     .filter((candidate) => candidate.publicAccess)
@@ -184,12 +197,14 @@ function getDiscoveryCacheKey(
   center: Coordinate,
   radiusMeters: number,
   limit: number,
+  includeTerrain: boolean,
 ): string {
   return [
     center.latitude.toFixed(3),
     center.longitude.toFixed(3),
     radiusMeters,
     limit,
+    includeTerrain ? "t" : "n",
   ].join(":");
 }
 

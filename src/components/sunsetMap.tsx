@@ -94,6 +94,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   const [sunsetSpots, setSunsetSpots] = useState<SunsetSpot[]>([]);
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
   const [isLoadingSpots, setIsLoadingSpots] = useState(false);
+  const [isRefiningSpots, setIsRefiningSpots] = useState(false);
   const [spotSource, setSpotSource] =
     useState<SunsetSpotResponse["source"] | null>(null);
   const [spotError, setSpotError] = useState<string | null>(null);
@@ -244,61 +245,87 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!queryCenter) {
+    const center = queryCenter;
+    if (!center) {
       return;
     }
 
     const abortController = new AbortController();
-    const timeout = setTimeout(() => {
+    const signal = abortController.signal;
+
+    const fetchSpots = async (
+      includeTerrain: boolean,
+    ): Promise<SunsetSpotResponse> => {
+      const searchParams = new URLSearchParams({
+        lat: String(center.lat),
+        lon: String(center.lng),
+        radiusMeters: String(SUNSET_SPOT_RADIUS_METERS),
+        limit: String(SUNSET_SPOT_LIMIT),
+        terrain: String(includeTerrain),
+      });
+      const response = await fetch(
+        `/api/locations/sunset-spots?${searchParams.toString()}`,
+        { signal },
+      );
+      if (!response.ok) {
+        throw new Error("Unable to load sunset spots");
+      }
+      return (await response.json()) as SunsetSpotResponse;
+    };
+
+    const loadSpots = async () => {
       setIsLoadingSpots(true);
       setSpotError(null);
 
-      const searchParams = new URLSearchParams({
-        lat: String(queryCenter.lat),
-        lon: String(queryCenter.lng),
-        radiusMeters: String(SUNSET_SPOT_RADIUS_METERS),
-        limit: String(SUNSET_SPOT_LIMIT),
-      });
-      const cacheKey = getSunsetSpotCacheKey(queryCenter);
+      const cacheKey = getSunsetSpotCacheKey(center);
       const cachedResponse = getCachedSunsetSpotResponse(cacheKey);
-
       if (cachedResponse) {
         applySunsetSpotResponse(cachedResponse);
         setIsLoadingSpots(false);
+        setIsRefiningSpots(false);
         return;
       }
 
-      fetch(`/api/locations/sunset-spots?${searchParams.toString()}`, {
-        signal: abortController.signal,
-      })
-        .then(async (response) => {
-          if (!response.ok) {
-            throw new Error("Unable to load sunset spots");
-          }
+      // Phase 1 — fast keyword-ranked paint (no terrain). Previous results stay
+      // on screen until this resolves, so a search never flashes empty.
+      let fastSucceeded = false;
+      try {
+        const fast = await fetchSpots(false);
+        if (signal.aborted) return;
+        applySunsetSpotResponse(fast);
+        setIsLoadingSpots(false);
+        setIsRefiningSpots(true);
+        fastSucceeded = true;
+      } catch {
+        if (signal.aborted) return;
+        // fall through to the full request as the primary attempt
+      }
 
-          return (await response.json()) as SunsetSpotResponse;
-        })
-        .then((data) => {
-          setCachedSunsetSpotResponse(cacheKey, data);
-          applySunsetSpotResponse(data);
-        })
-        .catch((error: unknown) => {
-          if (abortController.signal.aborted) {
-            return;
-          }
-
+      // Phase 2 — terrain-refined scores; caches the full result.
+      try {
+        const full = await fetchSpots(true);
+        if (signal.aborted) return;
+        setCachedSunsetSpotResponse(cacheKey, full);
+        applySunsetSpotResponse(full);
+      } catch (error) {
+        if (signal.aborted) return;
+        if (!fastSucceeded) {
           console.error("Error loading sunset spots:", error);
           setSunsetSpots([]);
           setSpotSource(null);
           setSelectedSpotId(null);
           setSpotError("Could not load nearby sunset spots.");
-        })
-        .finally(() => {
-          if (!abortController.signal.aborted) {
-            setIsLoadingSpots(false);
-          }
-        });
-    }, 650);
+        }
+        // else: keep the fast results — terrain refine is best-effort.
+      } finally {
+        if (!signal.aborted) {
+          setIsLoadingSpots(false);
+          setIsRefiningSpots(false);
+        }
+      }
+    };
+
+    const timeout = setTimeout(() => void loadSpots(), 650);
 
     return () => {
       clearTimeout(timeout);
@@ -521,6 +548,8 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
           spots={sunsetSpots}
           selectedSpotId={selectedSpotId}
           onSelectSpot={toggleSelectedSpot}
+          isLoading={isLoadingSpots}
+          isRefining={isRefiningSpots}
         />
 
         {/* Browse all nearby spots + filters */}

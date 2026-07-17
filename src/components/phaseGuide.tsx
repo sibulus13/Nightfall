@@ -1,4 +1,4 @@
-import { Sun, Sunset, Sparkles, CloudSun, Moon } from "lucide-react";
+import { Sun, Sunset, Sparkles, CloudSun, Moon, Loader2 } from "lucide-react";
 import type { SunsetSpot } from "~/types/sunsetSpot";
 import { bearingToCompass } from "~/lib/sunset/bearing";
 
@@ -87,22 +87,41 @@ export default function PhaseGuide({
   spots,
   selectedSpotId,
   onSelectSpot,
+  isLoading = false,
+  isRefining = false,
 }: {
   spots: SunsetSpot[];
   selectedSpotId: string | null;
   onSelectSpot: (spotId: string) => void;
+  isLoading?: boolean;
+  isRefining?: boolean;
 }) {
   return (
     <section className="nf-panel p-3">
       <header className="mb-3">
-        <div className="nf-section-label">The sunset, phase by phase</div>
+        <div className="flex items-center gap-2">
+          <div className="nf-section-label">The sunset, phase by phase</div>
+          {isRefining && (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              refining with terrain…
+            </span>
+          )}
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">
           Each phase peaks at a different time and wants a different horizon —
           here&apos;s the best nearby spot for each, in order.
         </p>
       </header>
 
-      <ol className="flex gap-3 overflow-x-auto pb-1 lg:flex-col lg:overflow-x-visible lg:pb-0">
+      {isLoading && spots.length === 0 ? (
+        <PhaseGuideSkeleton />
+      ) : (
+      <ol
+        className={`flex gap-3 overflow-x-auto pb-1 transition-opacity lg:flex-col lg:overflow-x-visible lg:pb-0 ${
+          isLoading ? "opacity-50" : ""
+        }`}
+      >
         {PHASES.map((phase) => {
           const best = bestSpotForPhase(spots, phase.key);
           const Icon = phase.icon;
@@ -170,6 +189,31 @@ export default function PhaseGuide({
           );
         })}
       </ol>
+      )}
     </section>
+  );
+}
+
+/** Placeholder cards shown on a cold search, before the fast first paint lands. */
+function PhaseGuideSkeleton() {
+  return (
+    <ol
+      className="flex gap-3 overflow-x-auto pb-1 lg:flex-col lg:overflow-x-visible lg:pb-0"
+      aria-hidden="true"
+    >
+      {PHASES.map((phase) => (
+        <li
+          key={phase.key}
+          className="flex min-w-[80%] shrink-0 flex-col gap-2 rounded-md border border-border bg-background/50 p-3 sm:min-w-[260px] lg:w-full lg:min-w-0 lg:shrink"
+        >
+          <div className="flex items-center gap-2">
+            <span className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-muted" />
+            <span className="h-4 w-24 animate-pulse rounded bg-muted" />
+          </div>
+          <span className="h-3 w-full animate-pulse rounded bg-muted" />
+          <span className="mt-1 h-10 w-full animate-pulse rounded bg-muted" />
+        </li>
+      ))}
+    </ol>
   );
 }
