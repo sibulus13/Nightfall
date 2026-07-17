@@ -1,4 +1,13 @@
-import { Sun, Sunset, Sparkles, CloudSun, Moon, Loader2 } from "lucide-react";
+import { useState } from "react";
+import {
+  Sun,
+  Sunset,
+  Sparkles,
+  CloudSun,
+  Moon,
+  Loader2,
+  ChevronDown,
+} from "lucide-react";
 import type { SunsetSpot } from "~/types/sunsetSpot";
 import { bearingToCompass } from "~/lib/sunset/bearing";
 
@@ -96,6 +105,18 @@ export default function PhaseGuide({
   isLoading?: boolean;
   isRefining?: boolean;
 }) {
+  const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
+  const toggleExpanded = (key: string) =>
+    setExpandedPhases((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+
   return (
     <section className="nf-panel p-3">
       <header className="mb-3">
@@ -138,60 +159,65 @@ export default function PhaseGuide({
             ? bearingForPhase(best.spot, phase.direction)
             : null;
           const isSelected = best?.spot.id === selectedSpotId;
+          const isExpanded = expandedPhases.has(phase.key);
 
           return (
             <li
               key={phase.key}
-              className="rounded-md border border-border bg-background/50 p-2.5"
+              className={`overflow-hidden rounded-md border bg-background/50 ${
+                isSelected ? "border-[#a6532d]" : "border-border"
+              }`}
             >
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 via-pink-500 to-violet-600 text-white shadow-sm">
-                  <Icon className="h-[15px] w-[15px]" aria-hidden="true" />
-                </span>
-                <h4 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
-                  {phase.label}
-                </h4>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {phase.when}
-                </span>
-              </div>
-
-              <p className="mt-1 text-xs leading-snug text-muted-foreground">
-                {phase.blurb}
-              </p>
-
-              <div className="mt-2">
-                {best ? (
-                  <button
-                    type="button"
-                    onClick={() => onSelectSpot(best.spot.id)}
-                    className={`flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors ${
-                      isSelected
-                        ? "border-[#a6532d] bg-[#fff4e8] dark:bg-[#33241d]"
-                        : "border-border bg-card hover:bg-muted"
-                    }`}
-                    title={`Show ${best.spot.name} on the map`}
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-foreground">
-                        {best.spot.name}
-                      </span>
-                      {bearing && (
-                        <span className="block text-xs text-muted-foreground">
-                          Look {bearing}
-                        </span>
-                      )}
-                    </span>
-                    <span className="nf-score shrink-0" title="Phase fit score">
-                      {best.score}
-                    </span>
-                  </button>
-                ) : (
-                  <p className="rounded-md border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground">
-                    No spots scouted yet.
-                  </p>
+              <div className="flex items-center gap-1.5 p-2">
+                {/* Whole row selects this phase's best spot on the map */}
+                <button
+                  type="button"
+                  onClick={() => best && onSelectSpot(best.spot.id)}
+                  disabled={!best}
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
+                  title={best ? `Show ${best.spot.name} on the map` : undefined}
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 via-pink-500 to-violet-600 text-white shadow-sm">
+                    <Icon className="h-[15px] w-[15px]" aria-hidden="true" />
+                  </span>
+                  <span className="shrink-0 text-sm font-semibold text-foreground">
+                    {phase.label}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                    {best
+                      ? `${best.spot.name}${bearing ? ` · ${bearing}` : ""}`
+                      : "No spots yet"}
+                  </span>
+                </button>
+                {best && (
+                  <span className="nf-score shrink-0" title="Phase fit score">
+                    {best.score}
+                  </span>
                 )}
+                <button
+                  type="button"
+                  onClick={() => toggleExpanded(phase.key)}
+                  className="nf-icon-button h-7 w-7 shrink-0"
+                  aria-expanded={isExpanded}
+                  aria-label={`${isExpanded ? "Hide" : "Show"} ${phase.label} details`}
+                >
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${
+                      isExpanded ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
               </div>
+
+              {isExpanded && (
+                <div className="border-t border-border px-2.5 py-2 text-xs leading-snug text-muted-foreground">
+                  <span className="font-medium text-foreground">
+                    {phase.when}
+                  </span>
+                  {" — "}
+                  {phase.blurb}
+                </div>
+              )}
             </li>
           );
         })}
@@ -208,14 +234,12 @@ function PhaseGuideSkeleton() {
       {PHASES.map((phase) => (
         <li
           key={phase.key}
-          className="flex flex-col gap-2 rounded-md border border-border bg-background/50 p-2.5"
+          className="flex items-center gap-2 rounded-md border border-border bg-background/50 p-2"
         >
-          <div className="flex items-center gap-2">
-            <span className="h-7 w-7 shrink-0 animate-pulse rounded-full bg-muted" />
-            <span className="h-4 w-24 animate-pulse rounded bg-muted" />
-          </div>
-          <span className="h-3 w-full animate-pulse rounded bg-muted" />
-          <span className="h-8 w-full animate-pulse rounded bg-muted" />
+          <span className="h-7 w-7 shrink-0 animate-pulse rounded-full bg-muted" />
+          <span className="h-4 w-20 shrink-0 animate-pulse rounded bg-muted" />
+          <span className="h-3 flex-1 animate-pulse rounded bg-muted" />
+          <span className="h-7 w-9 shrink-0 animate-pulse rounded bg-muted" />
         </li>
       ))}
     </ol>
