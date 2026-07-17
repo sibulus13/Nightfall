@@ -5,8 +5,9 @@ import type {
   SunsetLocationCandidate,
 } from "./types";
 
-// Primary endpoint first; mirrors are tried in order only after the primary
-// exhausts its retries. All are hit with identical headers (incl. User-Agent).
+// All endpoints are RACED (fastest healthy one wins), each with identical
+// headers (incl. User-Agent). Racing avoids the latency sink of sequential
+// failover — a slow or rate-limited primary no longer blocks the mirrors.
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
@@ -16,14 +17,9 @@ const DEFAULT_DISCOVERY_LIMIT = 50;
 const OSM_TIMEOUT_SECONDS = 8;
 const UNKNOWN_REGION: DiscoveryRegion = "unknown";
 
-// Resilience knobs. The server-side `[timeout:8]` in the query only bounds
-// Overpass' own execution; CLIENT_TIMEOUT_MS bounds our socket so a hung
-// connection can't stall the request handler.
-const MAX_ATTEMPTS = 3;
-const RETRY_BACKOFF_MS = [500, 1500] as const;
-const CLIENT_TIMEOUT_MS = 10_000;
-// Transient statuses worth retrying; 400/404 are deterministic client errors.
-const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+// Bounds each socket so a hung endpoint can't stall the race (the server-side
+// `[timeout:8]` only bounds Overpass' own execution).
+const CLIENT_TIMEOUT_MS = 9_000;
 
 interface OverpassElement {
   type: "node" | "way" | "relation";
@@ -62,42 +58,31 @@ export async function fetchOverpassSunsetCandidates(
     data: buildOverpassQuery(latitude, longitude, radiusMeters, limit, passName),
   });
 
-  let lastError: unknown;
-
-  for (const url of OVERPASS_ENDPOINTS) {
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      try {
-        return await fetchOverpassOnce(url, body);
-      } catch (error) {
-        lastError = error;
-
-        // Deterministic client errors (400/404) won't be fixed by retrying or
-        // by a mirror — the query itself is wrong. Fail fast.
-        if (
-          error instanceof OverpassRequestError &&
-          !RETRYABLE_STATUS.has(error.status)
-        ) {
-          throw error;
-        }
-
-        const backoffMs = RETRY_BACKOFF_MS[attempt];
-        if (backoffMs !== undefined) {
-          await delay(backoffMs);
-        }
-      }
+  // Race every mirror concurrently — the first healthy response wins, so a slow
+  // or rate-limited endpoint costs nothing. Promise.any rejects (AggregateError)
+  // only when ALL endpoints fail; we surface one error so the caller falls back.
+  try {
+    return await Promise.any(
+      OVERPASS_ENDPOINTS.map((url) => fetchOverpassOnce(url, body)),
+    );
+  } catch (error) {
+    const errors: unknown[] =
+      error instanceof AggregateError ? error.errors : [error];
+    const overpassError = errors.find(
+      (candidate): candidate is OverpassRequestError =>
+        candidate instanceof OverpassRequestError,
+    );
+    if (overpassError) {
+      throw overpassError;
     }
-    // Retries exhausted on this endpoint → fall through to the next mirror.
+    const first = errors[0];
+    throw new OverpassRequestError(
+      `All Overpass endpoints failed: ${
+        first instanceof Error ? first.message : String(first)
+      }`,
+      0,
+    );
   }
-
-  if (lastError instanceof OverpassRequestError) {
-    throw lastError;
-  }
-  throw new OverpassRequestError(
-    `Overpass request failed: ${
-      lastError instanceof Error ? lastError.message : String(lastError)
-    }`,
-    0,
-  );
 }
 
 /**
@@ -148,10 +133,6 @@ async function fetchOverpassOnce(
   }
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function buildOverpassQuery(
   latitude: number,
   longitude: number,
@@ -183,9 +164,6 @@ function buildOverpassQuery(
   node(around:${around})["highway"~"^(path|footway|cycleway)$"]["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge)",i];
   way(around:${around})["highway"~"^(path|footway|cycleway)$"]["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge)",i];
   relation(around:${around})["highway"~"^(path|footway|cycleway)$"]["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge)",i];
-  node(around:${around})["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge|Marine|Waterfront)",i];
-  way(around:${around})["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge|Marine|Waterfront)",i];
-  relation(around:${around})["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge|Marine|Waterfront)",i];
 );
 out center ${limit};
 `.trim();
