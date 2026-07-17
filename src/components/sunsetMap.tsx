@@ -296,8 +296,15 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
         return;
       }
 
-      // Phase 1 — fast keyword-ranked paint (no terrain). Previous results stay
-      // on screen until this resolves, so a search never flashes empty.
+      // New location → drop the previous location's spots so every component
+      // (phase guide, spot list, map pins) shows its own loading state instead
+      // of stale recommendations that no longer match where we're searching.
+      setSunsetSpots([]);
+      setSelectedSpotId(null);
+      setSpotSource(null);
+      setIsRefiningSpots(false);
+
+      // Phase 1 — fast keyword-ranked paint (no terrain).
       let fastSucceeded = false;
       try {
         const fast = await fetchSpots(false);
