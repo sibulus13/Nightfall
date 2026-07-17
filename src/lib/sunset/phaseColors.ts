@@ -15,15 +15,17 @@ export const PHASE_COLORS: Record<SunsetSpot["bestPhase"], string> = {
 };
 
 /**
- * A subtle single-phase gradient (low alpha) for tinting a card/row by the phase
- * it's best for — a hint of the visuals to expect. Kept legible over any card.
+ * The ONE standardized card wash, used everywhere a spot is shown (phase guide +
+ * recommended list). A faint BASE of the spot's phase colour on the left sweeps
+ * into a stronger HIGHLIGHT on the right. The grammar is identical on every card
+ * — only the hue (the spot's best phase) and vividness (its score, if given)
+ * vary — so the same spot reads as the same colour across surfaces.
  */
-export function phaseTintGradient(
+export function phaseCardGradient(
   phase: SunsetSpot["bestPhase"],
-  intensity = 0.14,
+  score?: number,
 ): string {
   const color = PHASE_COLORS[phase];
-  return `linear-gradient(100deg, rgba(${color}, ${intensity}), rgba(${color}, ${
-    intensity * 0.25
-  }))`;
+  const highlight = 0.12 + (score !== undefined ? (score / 100) * 0.12 : 0.06);
+  return `linear-gradient(100deg, rgba(${color}, 0.04) 0%, rgba(${color}, ${highlight}) 100%)`;
 }

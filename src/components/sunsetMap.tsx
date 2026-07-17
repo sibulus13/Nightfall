@@ -43,7 +43,7 @@ import {
 import CelestialIndicators from "./celestialIndicators";
 import PhaseGuide from "./phaseGuide";
 import { bearingToCompass } from "~/lib/sunset/bearing";
-import { phaseTintGradient } from "~/lib/sunset/phaseColors";
+import { phaseCardGradient } from "~/lib/sunset/phaseColors";
 import type { SunsetSpot, SunsetSpotResponse } from "~/types/sunsetSpot";
 
 interface SunsetMapProps {
@@ -930,8 +930,13 @@ function SunsetSpotsPanel({
                   ? "border-[#a6532d] bg-[#fff4e8] text-[#2b241f] dark:bg-[#33241d] dark:text-[#f7e4d4]"
                   : "border-[#d9c8b6] bg-white/60 hover:bg-[#f5eee5] dark:border-[#3f3933] dark:bg-white/5 dark:hover:bg-white/10"
               }`}
-              // Tint the row by the phase it's best for — a hint of the sky.
-              style={{ backgroundImage: phaseTintGradient(spot.bestPhase) }}
+              // Same standardized wash as the phase cards, keyed on best phase.
+              style={{
+                backgroundImage: phaseCardGradient(
+                  spot.bestPhase,
+                  spot.phaseScores[spot.bestPhase],
+                ),
+              }}
               title={`Show ${spot.name} on the map`}
             >
               <div className="flex items-start justify-between gap-2">

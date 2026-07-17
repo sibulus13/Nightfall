@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type { SunsetSpot } from "~/types/sunsetSpot";
 import { bearingToCompass } from "~/lib/sunset/bearing";
-import { PHASE_COLORS } from "~/lib/sunset/phaseColors";
+import { phaseCardGradient } from "~/lib/sunset/phaseColors";
 
 type Phase = SunsetSpot["bestPhase"];
 
@@ -130,28 +130,6 @@ function groupPhasesBySpot(spots: SunsetSpot[]): SpotGroup[] {
   return order.map((id) => groups.get(id)!);
 }
 
-/**
- * A subtle left-to-right gradient through the sky colours of the phases a spot
- * wins (warm → cool, chronological), so the card previews the visuals to expect.
- * A higher score reads a touch more vivid; kept low-alpha so text stays legible.
- */
-function buildCardGradient(colors: string[], topScore: number): string {
-  const intensity = 0.1 + (topScore / 100) * 0.14; // ~0.10–0.24
-  const stops =
-    colors.length === 1
-      ? [
-          `rgba(${colors[0]}, ${intensity})`,
-          `rgba(${colors[0]}, ${intensity * 0.25})`,
-        ]
-      : colors.map(
-          (color, index) =>
-            `rgba(${color}, ${intensity}) ${Math.round(
-              (index / (colors.length - 1)) * 100,
-            )}%`,
-        );
-  return `linear-gradient(100deg, ${stops.join(", ")})`;
-}
-
 export default function PhaseGuide({
   spots,
   selectedSpotId,
@@ -221,10 +199,7 @@ export default function PhaseGuide({
           const phaseSummary = group.entries
             .map((entry) => entry.phase.label)
             .join(" · ");
-          const gradient = buildCardGradient(
-            group.entries.map((entry) => PHASE_COLORS[entry.phase.key]),
-            group.topScore,
-          );
+          const gradient = phaseCardGradient(group.spot.bestPhase, group.topScore);
 
           return (
             <li
