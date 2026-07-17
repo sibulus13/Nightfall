@@ -20,6 +20,8 @@ interface PhaseMeta {
   blurb: string;
   icon: typeof Sun;
   direction: "west" | "east" | null;
+  /** Characteristic sky colour (rgb triplet) used for the card gradient. */
+  color: string;
 }
 
 /** Chronological order of the sunset sequence — the strip reads left → right as time. */
@@ -31,6 +33,7 @@ const PHASES: PhaseMeta[] = [
     blurb: "Warm, low side-light that rakes across the scene. Face west.",
     icon: Sun,
     direction: "west",
+    color: "251, 191, 36",
   },
   {
     key: "sunDisk",
@@ -39,6 +42,7 @@ const PHASES: PhaseMeta[] = [
     blurb: "The sun itself on the horizon — wants a clean, open western view.",
     icon: Sunset,
     direction: "west",
+    color: "249, 115, 22",
   },
   {
     key: "beltOfVenus",
@@ -47,6 +51,7 @@ const PHASES: PhaseMeta[] = [
     blurb: "The pink band above the Earth's shadow, opposite the sun. Look east.",
     icon: Sparkles,
     direction: "east",
+    color: "244, 114, 182",
   },
   {
     key: "civilTwilight",
@@ -55,6 +60,7 @@ const PHASES: PhaseMeta[] = [
     blurb: "The sky's peak afterglow colour, overhead and all around.",
     icon: CloudSun,
     direction: null,
+    color: "167, 139, 250",
   },
   {
     key: "blueHour",
@@ -63,6 +69,7 @@ const PHASES: PhaseMeta[] = [
     blurb: "Deep-blue calm — the moment for city lights and reflections.",
     icon: Moon,
     direction: null,
+    color: "96, 165, 250",
   },
 ];
 
@@ -127,6 +134,28 @@ function groupPhasesBySpot(spots: SunsetSpot[]): SpotGroup[] {
   }
 
   return order.map((id) => groups.get(id)!);
+}
+
+/**
+ * A subtle left-to-right gradient through the sky colours of the phases a spot
+ * wins (warm → cool, chronological), so the card previews the visuals to expect.
+ * A higher score reads a touch more vivid; kept low-alpha so text stays legible.
+ */
+function buildCardGradient(colors: string[], topScore: number): string {
+  const intensity = 0.1 + (topScore / 100) * 0.14; // ~0.10–0.24
+  const stops =
+    colors.length === 1
+      ? [
+          `rgba(${colors[0]}, ${intensity})`,
+          `rgba(${colors[0]}, ${intensity * 0.25})`,
+        ]
+      : colors.map(
+          (color, index) =>
+            `rgba(${color}, ${intensity}) ${Math.round(
+              (index / (colors.length - 1)) * 100,
+            )}%`,
+        );
+  return `linear-gradient(100deg, ${stops.join(", ")})`;
 }
 
 export default function PhaseGuide({
@@ -198,6 +227,10 @@ export default function PhaseGuide({
           const phaseSummary = group.entries
             .map((entry) => entry.phase.label)
             .join(" · ");
+          const gradient = buildCardGradient(
+            group.entries.map((entry) => entry.phase.color),
+            group.topScore,
+          );
 
           return (
             <li
@@ -205,6 +238,7 @@ export default function PhaseGuide({
               className={`overflow-hidden rounded-md border bg-background/50 ${
                 isSelected ? "border-[#a6532d]" : "border-border"
               }`}
+              style={{ backgroundImage: gradient }}
             >
               <div className="flex items-center gap-1.5 p-2">
                 {/* Whole row shows this spot on the map */}
