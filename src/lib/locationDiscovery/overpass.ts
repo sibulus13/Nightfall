@@ -152,15 +152,9 @@ function buildOverpassQuery(
   node(around:${around})["leisure"~"^(park|nature_reserve|marina)$"];
   way(around:${around})["leisure"~"^(park|nature_reserve|marina)$"];
   relation(around:${around})["leisure"~"^(park|nature_reserve|marina)$"];
-  node(around:${around})["natural"~"^(beach|peak|cliff|bay|water|wood)$"];
-  way(around:${around})["natural"~"^(beach|peak|cliff|bay|water|wood)$"];
-  relation(around:${around})["natural"~"^(beach|peak|cliff|bay|water|wood)$"];
-  node(around:${around})["water"~"^(lake|pond|reservoir|basin)$"];
-  way(around:${around})["water"~"^(lake|pond|reservoir|basin)$"];
-  relation(around:${around})["water"~"^(lake|pond|reservoir|basin)$"];
-  node(around:${around})["waterway"~"^(river|stream)$"];
-  way(around:${around})["waterway"~"^(river|stream)$"];
-  relation(around:${around})["waterway"~"^(river|stream)$"];
+  node(around:${around})["natural"~"^(beach|peak|cliff|bay)$"];
+  way(around:${around})["natural"~"^(beach|peak|cliff|bay)$"];
+  relation(around:${around})["natural"~"^(beach|peak|cliff|bay)$"];
   node(around:${around})["highway"~"^(path|footway|cycleway)$"]["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge)",i];
   way(around:${around})["highway"~"^(path|footway|cycleway)$"]["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge)",i];
   relation(around:${around})["highway"~"^(path|footway|cycleway)$"]["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge)",i];
