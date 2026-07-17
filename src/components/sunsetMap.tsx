@@ -263,7 +263,9 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     ): Promise<SunsetSpotResponse> => {
       const searchParams = new URLSearchParams({
         lat: String(center.lat),
-        lon: String(center.lng),
+        // Normalize at the API boundary too — guarantees a valid lon regardless
+        // of how queryCenter was set (map pans can wrap past 180).
+        lon: String(normalizeLongitude(center.lng)),
         radiusMeters: String(SUNSET_SPOT_RADIUS_METERS),
         limit: String(SUNSET_SPOT_LIMIT),
         terrain: String(includeTerrain),
