@@ -81,6 +81,11 @@ interface ActiveSpotFilters {
   features: string[];
 }
 
+/** Wrap a longitude into the valid [-180, 180] range. */
+function normalizeLongitude(lng: number): number {
+  return ((((lng + 180) % 360) + 360) % 360) - 180;
+}
+
 const SunsetMap: React.FC<SunsetMapProps> = ({
   initialLocation,
   zoomLevel = 10,
@@ -411,7 +416,10 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       const nextCenter = event.detail.center
         ? {
             lat: event.detail.center.lat,
-            lng: event.detail.center.lng,
+            // Google Maps can report a longitude outside [-180, 180] after the
+            // user pans across/around the globe (e.g. 237 = -123 + 360). Wrap it
+            // back into range so the API (and geocoder) don't 400 on it.
+            lng: normalizeLongitude(event.detail.center.lng),
           }
         : null;
 
