@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { SunsetSpot } from "~/types/sunsetSpot";
 import { bearingToCompass } from "~/lib/sunset/bearing";
+import { PHASE_COLORS } from "~/lib/sunset/phaseColors";
 
 type Phase = SunsetSpot["bestPhase"];
 
@@ -20,8 +21,6 @@ interface PhaseMeta {
   blurb: string;
   icon: typeof Sun;
   direction: "west" | "east" | null;
-  /** Characteristic sky colour (rgb triplet) used for the card gradient. */
-  color: string;
 }
 
 /** Chronological order of the sunset sequence — the strip reads left → right as time. */
@@ -33,7 +32,6 @@ const PHASES: PhaseMeta[] = [
     blurb: "Warm, low side-light that rakes across the scene. Face west.",
     icon: Sun,
     direction: "west",
-    color: "251, 191, 36",
   },
   {
     key: "sunDisk",
@@ -42,7 +40,6 @@ const PHASES: PhaseMeta[] = [
     blurb: "The sun itself on the horizon — wants a clean, open western view.",
     icon: Sunset,
     direction: "west",
-    color: "249, 115, 22",
   },
   {
     key: "beltOfVenus",
@@ -51,7 +48,6 @@ const PHASES: PhaseMeta[] = [
     blurb: "The pink band above the Earth's shadow, opposite the sun. Look east.",
     icon: Sparkles,
     direction: "east",
-    color: "244, 114, 182",
   },
   {
     key: "civilTwilight",
@@ -60,7 +56,6 @@ const PHASES: PhaseMeta[] = [
     blurb: "The sky's peak afterglow colour, overhead and all around.",
     icon: CloudSun,
     direction: null,
-    color: "167, 139, 250",
   },
   {
     key: "blueHour",
@@ -69,7 +64,6 @@ const PHASES: PhaseMeta[] = [
     blurb: "Deep-blue calm — the moment for city lights and reflections.",
     icon: Moon,
     direction: null,
-    color: "96, 165, 250",
   },
 ];
 
@@ -228,7 +222,7 @@ export default function PhaseGuide({
             .map((entry) => entry.phase.label)
             .join(" · ");
           const gradient = buildCardGradient(
-            group.entries.map((entry) => entry.phase.color),
+            group.entries.map((entry) => PHASE_COLORS[entry.phase.key]),
             group.topScore,
           );
 
