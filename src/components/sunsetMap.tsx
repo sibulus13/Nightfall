@@ -67,6 +67,8 @@ const SUNSET_SPOT_CACHE_TTL_MS = 15 * 60 * 1000;
 const SUNSET_SPOT_CACHE_KEY_PREFIX = "sunset-app-spot-cache-v2";
 const MAP_SETTLE_DELAY_MS = 900;
 const MIN_RECOMMENDATION_MOVE_METERS = 900;
+// Selected spot marker sits above all others so its detail card isn't covered.
+const SELECTED_SPOT_Z_INDEX = 1000;
 
 interface SunsetSpotCacheEntry {
   expiresAt: number;
@@ -690,6 +692,9 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
                   key={spot.id}
                   position={{ lat: spot.latitude, lng: spot.longitude }}
                   onClick={() => toggleSelectedSpot(spot.id)}
+                  // Raise the selected marker above all others so its open
+                  // detail card isn't covered by neighbouring markers.
+                  zIndex={isSelected ? SELECTED_SPOT_Z_INDEX : undefined}
                 >
                   <SunsetSpotMarker
                     spot={spot}
