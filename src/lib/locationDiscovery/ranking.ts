@@ -2,6 +2,7 @@ import type {
   DiscoveryEvaluation,
   DiscoveryRegion,
   DiscoverySource,
+  HorizonProfile,
   RankedSunsetLocation,
   SourceEfficiencyProfile,
   SunsetLocationCandidate,
@@ -147,28 +148,43 @@ function getPhaseScores({
   const vantageScore = candidate.hasElevation || candidate.kind === "elevated-park" ? 86 : 34;
   const foregroundScore = hasForegroundSignal(candidate) ? 78 : 42;
   const cityLightScore = hasCityLightSignal(candidate) ? 82 : 36;
+  const varietyScore = getVarietyScore(candidate);
+
+  // Directional view quality from terrain (clearance-gated backdrop/relief).
+  // Falls back to keyword heuristics when terrain enrichment is unavailable.
+  // Belt of Venus reads the EAST (anti-solar) horizon; sunset phases read WEST.
+  const eastViewScore = directionalViewScore(
+    candidate.viewProfiles?.east,
+    horizonScore,
+  );
+  const westFallbackScore = clampScore(0.6 * horizonScore + westwardViewScore);
+  const westViewScore = directionalViewScore(
+    candidate.viewProfiles?.west,
+    westFallbackScore,
+  );
 
   return {
     goldenHour: clampScore(
       scenicScore * 0.24 +
-        westwardViewScore * 0.26 +
-        foregroundScore * 0.20 +
+        westViewScore * 0.22 +
+        foregroundScore * 0.18 +
         reflectionScore * 0.16 +
-        accessibilityScore * 0.14,
+        varietyScore * 0.10 +
+        accessibilityScore * 0.10,
     ),
     sunDisk: clampScore(
-      westwardViewScore * 0.34 +
-        horizonScore * 0.28 +
+      westViewScore * 0.40 +
         vantageScore * 0.18 +
-        scenicScore * 0.12 +
-        accessibilityScore * 0.08,
+        scenicScore * 0.16 +
+        varietyScore * 0.14 +
+        accessibilityScore * 0.12,
     ),
     beltOfVenus: clampScore(
-      horizonScore * 0.30 +
-        vantageScore * 0.22 +
-        viewQualityScore * 0.20 +
-        scenicScore * 0.14 +
-        referenceScore * 0.14,
+      eastViewScore * 0.42 +
+        vantageScore * 0.16 +
+        varietyScore * 0.16 +
+        viewQualityScore * 0.14 +
+        referenceScore * 0.12,
     ),
     civilTwilight: clampScore(
       foregroundScore * 0.26 +
@@ -418,6 +434,50 @@ function hasCityLightSignal(candidate: SunsetLocationCandidate): boolean {
 
 function clampScore(score: number): number {
   return Math.round(Math.max(0, Math.min(score, SCORE_MAX)));
+}
+
+/**
+ * Directional view quality (0-100) from a terrain horizon profile.
+ * `clearance` acts as a GATE (a blocked near horizon tanks the score — you
+ * can't see the phenomenon), while `backdrop` and `relief` DIFFERENTIATE:
+ * an open-but-empty horizon scores ~55, a clear horizon framed by distant
+ * relief approaches 100. Falls back to a keyword-derived score when terrain
+ * data is unavailable.
+ */
+function directionalViewScore(
+  profile: HorizonProfile | undefined,
+  fallbackScore: number,
+): number {
+  if (!profile) {
+    return fallbackScore;
+  }
+  const composition = 0.55 + 0.28 * profile.backdrop + 0.17 * profile.relief;
+  return clampScore(SCORE_MAX * profile.clearance * composition);
+}
+
+/**
+ * Landscape variety (0-100): how many distinct scene elements co-occur
+ * (water, elevation, foreground subject, city lights, open horizon), blended
+ * with terrain ruggedness in view. A monotone scene scores low even when
+ * technically "clear"; a varied one — water + relief + skyline — scores high.
+ */
+function getVarietyScore(candidate: SunsetLocationCandidate): number {
+  const elementSignals = [
+    candidate.hasWaterView,
+    candidate.hasElevation,
+    hasForegroundSignal(candidate),
+    hasCityLightSignal(candidate),
+    hasOpenHorizonSignal(candidate),
+  ];
+  const diversityScore =
+    (elementSignals.filter(Boolean).length / elementSignals.length) * SCORE_MAX;
+
+  const relief = Math.max(
+    candidate.viewProfiles?.east?.relief ?? 0,
+    candidate.viewProfiles?.west?.relief ?? 0,
+  );
+
+  return clampScore(0.7 * diversityScore + 0.3 * (relief * SCORE_MAX));
 }
 
 function radiansToCompassDegrees(azimuthRadians: number): number {

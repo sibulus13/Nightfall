@@ -48,8 +48,11 @@ const getLocationName = async (
   lng: number,
 ): Promise<string | null> => {
   try {
+    // Wrap longitude into [-180,180] — the map can report a wrapped value after
+    // panning around the globe, which the geocoder rejects with 400.
+    const normalizedLng = ((((lng + 180) % 360) + 360) % 360) - 180;
     const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`,
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${normalizedLng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`,
     );
     const data = (await response.json()) as {
       results?: Array<{

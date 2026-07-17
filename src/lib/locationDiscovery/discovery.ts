@@ -5,6 +5,7 @@ import {
   OverpassRequestError,
 } from "./overpass";
 import { rankSunsetLocation } from "./ranking";
+import { enrichCandidatesWithTerrain } from "./terrain";
 import {
   getNearbyValidatedCandidates,
   mergeValidatedReferences,
@@ -34,6 +35,12 @@ const discoveryCache = new Map<
 export interface DiscoverSunsetLocationsOptions extends Coordinate {
   radiusMeters?: number;
   limit?: number;
+  /**
+   * When false, skip the (slower) terrain enrichment and rank on keyword
+   * heuristics only. Used for the progressive first paint — the client fetches
+   * `terrain=false` for an instant result, then `terrain=true` to refine.
+   */
+  includeTerrain?: boolean;
 }
 
 export interface DiscoverSunsetLocationsResult {
@@ -50,11 +57,17 @@ export async function discoverSunsetLocations(
 ): Promise<DiscoverSunsetLocationsResult> {
   const radiusMeters = clampRadius(options.radiusMeters);
   const limit = clampLimit(options.limit);
+  const includeTerrain = options.includeTerrain !== false;
   const center = {
     latitude: options.latitude,
     longitude: options.longitude,
   };
-  const cacheKey = getDiscoveryCacheKey(center, radiusMeters, limit);
+  const cacheKey = getDiscoveryCacheKey(
+    center,
+    radiusMeters,
+    limit,
+    includeTerrain,
+  );
   const cachedResult = discoveryCache.get(cacheKey);
 
   if (cachedResult && cachedResult.expiresAt > Date.now()) {
@@ -75,7 +88,10 @@ export async function discoverSunsetLocations(
       mergeValidatedReferences,
     ),
   );
-  const candidates = enrichedCandidates
+  const terrainEnrichedCandidates = includeTerrain
+    ? await enrichCandidatesWithTerrain(enrichedCandidates)
+    : enrichedCandidates;
+  const candidates = terrainEnrichedCandidates
     .map(rankSunsetLocation)
     .filter((candidate) => candidate.publicAccess)
     .sort((a, b) => {
@@ -135,36 +151,32 @@ async function fetchLiveCandidates(
       radiusMeters,
     },
   ];
-  const candidates: SunsetLocationCandidate[] = [];
-  const passesTried: DiscoveryPassName[] = [];
-
-  for (const pass of passes) {
-    passesTried.push(pass.name);
-
-    try {
-      const passCandidates = await fetchOverpassSunsetCandidates(
+  // Run the passes concurrently — serial failover across passes was the main
+  // latency sink (each slow Overpass pass stacked on the previous one).
+  const passResults = await Promise.allSettled(
+    passes.map((pass) =>
+      fetchOverpassSunsetCandidates(
         center.latitude,
         center.longitude,
         pass.radiusMeters,
         limit * 4,
         pass.name,
-      );
+      ),
+    ),
+  );
 
-      candidates.push(...passCandidates);
-
-      if (dedupeCandidates(candidates).length >= limit) {
-        break;
-      }
-    } catch (error) {
-      logOverpassFailure(pass.name, error);
+  const candidates: SunsetLocationCandidate[] = [];
+  passResults.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      candidates.push(...result.value);
+    } else {
+      logOverpassFailure(passes[index]!.name, result.reason);
     }
-  }
-
-  passesTried.push("regional-fallback");
+  });
 
   return {
     candidates: dedupeCandidates(candidates),
-    passesTried,
+    passesTried: [...passes.map((pass) => pass.name), "regional-fallback"],
   };
 }
 
@@ -181,12 +193,14 @@ function getDiscoveryCacheKey(
   center: Coordinate,
   radiusMeters: number,
   limit: number,
+  includeTerrain: boolean,
 ): string {
   return [
     center.latitude.toFixed(3),
     center.longitude.toFixed(3),
     radiusMeters,
     limit,
+    includeTerrain ? "t" : "n",
   ].join(":");
 }
 

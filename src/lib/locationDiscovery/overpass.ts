@@ -5,10 +5,21 @@ import type {
   SunsetLocationCandidate,
 } from "./types";
 
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+// All endpoints are RACED (fastest healthy one wins), each with identical
+// headers (incl. User-Agent). Racing avoids the latency sink of sequential
+// failover — a slow or rate-limited primary no longer blocks the mirrors.
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+] as const;
 const DEFAULT_DISCOVERY_LIMIT = 50;
 const OSM_TIMEOUT_SECONDS = 8;
 const UNKNOWN_REGION: DiscoveryRegion = "unknown";
+
+// Bounds each socket so a hung endpoint can't stall the race (the server-side
+// `[timeout:8]` only bounds Overpass' own execution).
+const CLIENT_TIMEOUT_MS = 9_000;
 
 interface OverpassElement {
   type: "node" | "way" | "relation";
@@ -43,39 +54,83 @@ export async function fetchOverpassSunsetCandidates(
   limit = DEFAULT_DISCOVERY_LIMIT,
   passName: DiscoveryPassName = "high-confidence",
 ): Promise<SunsetLocationCandidate[]> {
-  const response = await fetch(OVERPASS_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-    },
-    body: new URLSearchParams({
-      data: buildOverpassQuery(
-        latitude,
-        longitude,
-        radiusMeters,
-        limit,
-        passName,
-      ),
-    }),
-    next: {
-      revalidate: 60 * 60 * 24,
-    },
+  const body = new URLSearchParams({
+    data: buildOverpassQuery(latitude, longitude, radiusMeters, limit, passName),
   });
 
-  if (!response.ok) {
+  // Race every mirror concurrently — the first healthy response wins, so a slow
+  // or rate-limited endpoint costs nothing. Promise.any rejects (AggregateError)
+  // only when ALL endpoints fail; we surface one error so the caller falls back.
+  try {
+    return await Promise.any(
+      OVERPASS_ENDPOINTS.map((url) => fetchOverpassOnce(url, body)),
+    );
+  } catch (error) {
+    const errors: unknown[] =
+      error instanceof AggregateError ? error.errors : [error];
+    const overpassError = errors.find(
+      (candidate): candidate is OverpassRequestError =>
+        candidate instanceof OverpassRequestError,
+    );
+    if (overpassError) {
+      throw overpassError;
+    }
+    const first = errors[0];
     throw new OverpassRequestError(
-      `Overpass request failed with status ${response.status}`,
-      response.status,
+      `All Overpass endpoints failed: ${
+        first instanceof Error ? first.message : String(first)
+      }`,
+      0,
     );
   }
+}
 
-  const data = (await response.json()) as OverpassResponse;
+/**
+ * A single Overpass request against one endpoint: bounded by a client-side
+ * AbortController timeout, non-ok → OverpassRequestError (so the caller can
+ * inspect status and decide retryability), then parsed into candidates.
+ */
+async function fetchOverpassOnce(
+  url: string,
+  body: URLSearchParams,
+): Promise<SunsetLocationCandidate[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
 
-  return (data.elements ?? [])
-    .map(mapOverpassElementToCandidate)
-    .filter(
-      (candidate): candidate is SunsetLocationCandidate => candidate !== null,
-    );
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        // Overpass rejects UA-less requests with 406; without this the app
+        // silently fell back to the BC-only validated list everywhere.
+        "User-Agent": "Nightfalls-Sunset/1.0 (+https://nightfalls.app)",
+        Accept: "application/json",
+      },
+      body,
+      signal: controller.signal,
+      next: {
+        revalidate: 60 * 60 * 24,
+      },
+    });
+
+    if (!response.ok) {
+      throw new OverpassRequestError(
+        `Overpass request failed with status ${response.status}`,
+        response.status,
+      );
+    }
+
+    const data = (await response.json()) as OverpassResponse;
+
+    return (data.elements ?? [])
+      .map(mapOverpassElementToCandidate)
+      .filter(
+        (candidate): candidate is SunsetLocationCandidate => candidate !== null,
+      );
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function buildOverpassQuery(
@@ -97,21 +152,12 @@ function buildOverpassQuery(
   node(around:${around})["leisure"~"^(park|nature_reserve|marina)$"];
   way(around:${around})["leisure"~"^(park|nature_reserve|marina)$"];
   relation(around:${around})["leisure"~"^(park|nature_reserve|marina)$"];
-  node(around:${around})["natural"~"^(beach|peak|cliff|bay|water|wood)$"];
-  way(around:${around})["natural"~"^(beach|peak|cliff|bay|water|wood)$"];
-  relation(around:${around})["natural"~"^(beach|peak|cliff|bay|water|wood)$"];
-  node(around:${around})["water"~"^(lake|pond|reservoir|basin)$"];
-  way(around:${around})["water"~"^(lake|pond|reservoir|basin)$"];
-  relation(around:${around})["water"~"^(lake|pond|reservoir|basin)$"];
-  node(around:${around})["waterway"~"^(river|stream)$"];
-  way(around:${around})["waterway"~"^(river|stream)$"];
-  relation(around:${around})["waterway"~"^(river|stream)$"];
+  node(around:${around})["natural"~"^(beach|peak|cliff|bay)$"];
+  way(around:${around})["natural"~"^(beach|peak|cliff|bay)$"];
+  relation(around:${around})["natural"~"^(beach|peak|cliff|bay)$"];
   node(around:${around})["highway"~"^(path|footway|cycleway)$"]["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge)",i];
   way(around:${around})["highway"~"^(path|footway|cycleway)$"]["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge)",i];
   relation(around:${around})["highway"~"^(path|footway|cycleway)$"]["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge)",i];
-  node(around:${around})["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge|Marine|Waterfront)",i];
-  way(around:${around})["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge|Marine|Waterfront)",i];
-  relation(around:${around})["name"~"(View|Lookout|Point|Shore|Dyke|Dike|Beach|Pier|Lake|Inlet|River|Mountain|Ridge|Marine|Waterfront)",i];
 );
 out center ${limit};
 `.trim();

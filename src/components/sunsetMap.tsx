@@ -41,6 +41,9 @@ import {
   Waves,
 } from "lucide-react";
 import CelestialIndicators from "./celestialIndicators";
+import PhaseGuide from "./phaseGuide";
+import { bearingToCompass } from "~/lib/sunset/bearing";
+import { phaseCardGradient } from "~/lib/sunset/phaseColors";
 import type { SunsetSpot, SunsetSpotResponse } from "~/types/sunsetSpot";
 
 interface SunsetMapProps {
@@ -56,7 +59,7 @@ interface SunsetMapProps {
 
 const mapContainerStyle = {
   width: "100%",
-  height: "520px",
+  height: "100%",
 };
 
 const SUNSET_SPOT_RADIUS_METERS = 20000;
@@ -65,6 +68,8 @@ const SUNSET_SPOT_CACHE_TTL_MS = 15 * 60 * 1000;
 const SUNSET_SPOT_CACHE_KEY_PREFIX = "sunset-app-spot-cache-v2";
 const MAP_SETTLE_DELAY_MS = 900;
 const MIN_RECOMMENDATION_MOVE_METERS = 900;
+// Selected spot marker sits above all others so its detail card isn't covered.
+const SELECTED_SPOT_Z_INDEX = 1000;
 
 interface SunsetSpotCacheEntry {
   expiresAt: number;
@@ -77,6 +82,11 @@ interface ActiveSpotFilters {
   phases: string[];
   locationTypes: string[];
   features: string[];
+}
+
+/** Wrap a longitude into the valid [-180, 180] range. */
+function normalizeLongitude(lng: number): number {
+  return ((((lng + 180) % 360) + 360) % 360) - 180;
 }
 
 const SunsetMap: React.FC<SunsetMapProps> = ({
@@ -92,6 +102,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   const [sunsetSpots, setSunsetSpots] = useState<SunsetSpot[]>([]);
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
   const [isLoadingSpots, setIsLoadingSpots] = useState(false);
+  const [isRefiningSpots, setIsRefiningSpots] = useState(false);
   const [spotSource, setSpotSource] =
     useState<SunsetSpotResponse["source"] | null>(null);
   const [spotError, setSpotError] = useState<string | null>(null);
@@ -242,61 +253,89 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!queryCenter) {
+    const center = queryCenter;
+    if (!center) {
       return;
     }
 
     const abortController = new AbortController();
-    const timeout = setTimeout(() => {
+    const signal = abortController.signal;
+
+    const fetchSpots = async (
+      includeTerrain: boolean,
+    ): Promise<SunsetSpotResponse> => {
+      const searchParams = new URLSearchParams({
+        lat: String(center.lat),
+        // Normalize at the API boundary too — guarantees a valid lon regardless
+        // of how queryCenter was set (map pans can wrap past 180).
+        lon: String(normalizeLongitude(center.lng)),
+        radiusMeters: String(SUNSET_SPOT_RADIUS_METERS),
+        limit: String(SUNSET_SPOT_LIMIT),
+        terrain: String(includeTerrain),
+      });
+      const response = await fetch(
+        `/api/locations/sunset-spots?${searchParams.toString()}`,
+        { signal },
+      );
+      if (!response.ok) {
+        throw new Error("Unable to load sunset spots");
+      }
+      return (await response.json()) as SunsetSpotResponse;
+    };
+
+    const loadSpots = async () => {
       setIsLoadingSpots(true);
       setSpotError(null);
 
-      const searchParams = new URLSearchParams({
-        lat: String(queryCenter.lat),
-        lon: String(queryCenter.lng),
-        radiusMeters: String(SUNSET_SPOT_RADIUS_METERS),
-        limit: String(SUNSET_SPOT_LIMIT),
-      });
-      const cacheKey = getSunsetSpotCacheKey(queryCenter);
+      const cacheKey = getSunsetSpotCacheKey(center);
       const cachedResponse = getCachedSunsetSpotResponse(cacheKey);
-
       if (cachedResponse) {
         applySunsetSpotResponse(cachedResponse);
         setIsLoadingSpots(false);
+        setIsRefiningSpots(false);
         return;
       }
 
-      fetch(`/api/locations/sunset-spots?${searchParams.toString()}`, {
-        signal: abortController.signal,
-      })
-        .then(async (response) => {
-          if (!response.ok) {
-            throw new Error("Unable to load sunset spots");
-          }
+      // Phase 1 — fast keyword-ranked paint (no terrain). Previous results stay
+      // on screen until this resolves, so a search never flashes empty.
+      let fastSucceeded = false;
+      try {
+        const fast = await fetchSpots(false);
+        if (signal.aborted) return;
+        applySunsetSpotResponse(fast);
+        setIsLoadingSpots(false);
+        setIsRefiningSpots(true);
+        fastSucceeded = true;
+      } catch {
+        if (signal.aborted) return;
+        // fall through to the full request as the primary attempt
+      }
 
-          return (await response.json()) as SunsetSpotResponse;
-        })
-        .then((data) => {
-          setCachedSunsetSpotResponse(cacheKey, data);
-          applySunsetSpotResponse(data);
-        })
-        .catch((error: unknown) => {
-          if (abortController.signal.aborted) {
-            return;
-          }
-
+      // Phase 2 — terrain-refined scores; caches the full result.
+      try {
+        const full = await fetchSpots(true);
+        if (signal.aborted) return;
+        setCachedSunsetSpotResponse(cacheKey, full);
+        applySunsetSpotResponse(full);
+      } catch (error) {
+        if (signal.aborted) return;
+        if (!fastSucceeded) {
           console.error("Error loading sunset spots:", error);
           setSunsetSpots([]);
           setSpotSource(null);
           setSelectedSpotId(null);
           setSpotError("Could not load nearby sunset spots.");
-        })
-        .finally(() => {
-          if (!abortController.signal.aborted) {
-            setIsLoadingSpots(false);
-          }
-        });
-    }, 650);
+        }
+        // else: keep the fast results — terrain refine is best-effort.
+      } finally {
+        if (!signal.aborted) {
+          setIsLoadingSpots(false);
+          setIsRefiningSpots(false);
+        }
+      }
+    };
+
+    const timeout = setTimeout(() => void loadSpots(), 650);
 
     return () => {
       clearTimeout(timeout);
@@ -379,6 +418,10 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   const onBoundsChanged = useCallback(
     (event: MapCameraChangedEvent) => {
       const nextZoom = event.detail.zoom;
+      // Keep the RAW longitude for the map's own state so the controlled center
+      // matches where the user actually dragged (normalizing here snapped the
+      // map back and broke panning). Longitude is wrapped into [-180,180] only
+      // at the API boundaries (spots fetch + geocode).
       const nextCenter = event.detail.center
         ? {
             lat: event.detail.center.lat,
@@ -437,21 +480,14 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   }, []);
 
   return (
-    <div className="space-y-4">
-      {/* Instructions and Controls - Above the Map */}
-      <div className="nf-panel p-3">
-        <div className="text-sm text-muted-foreground">
-          <p>
-            Click on the map to place markers (up to 5). Click on existing
-            markers to remove them.
-          </p>
-          <p className="mt-1">Markers placed: {markers.length}/5</p>
-        </div>
-
-        {/* Controls Row - Date Selector Left, Action Buttons Right */}
-        <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          {/* Day Selector - Left Side */}
-          <div className="flex items-center">
+    <div className="flex flex-col gap-4 lg:grid lg:h-[calc(100vh-6rem)] lg:grid-cols-[minmax(0,1fr)_400px] lg:grid-rows-[minmax(0,1fr)] lg:gap-4 lg:overflow-hidden">
+      {/* RIGHT RAIL — DOM-first so selectables sit ABOVE the map on mobile; moves to the right column on desktop. Scrolls internally so the outer frame stays one viewport. */}
+      <div className="flex min-h-0 flex-col gap-3 lg:order-2 lg:h-full lg:overflow-y-auto lg:pr-1">
+        {/* Compact controls (markers / day / Predict / Clear) */}
+        <div className="nf-panel p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {/* Day Selector */}
+            <div className="flex items-center">
             {dateOptions.length > 0 ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -511,15 +547,53 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
               </Button>
             )}
           </div>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Tap the map to place markers (up to 5); tap a marker to remove it ·{" "}
+            {markers.length}/5 placed
+          </p>
         </div>
+
+        {/* Aggregate banner — once ≥2 markers have predictions */}
+        {dayStats && <DayStatsBanner stats={dayStats} />}
+
+        {/* Phase recommendations (output) */}
+        <PhaseGuide
+          spots={sunsetSpots}
+          selectedSpotId={selectedSpotId}
+          onSelectSpot={toggleSelectedSpot}
+          isLoading={isLoadingSpots}
+          isRefining={isRefiningSpots}
+        />
+
+        {/* Browse all nearby spots + filters */}
+        <SunsetSpotsPanel
+          spots={filteredSunsetSpots}
+          availableFilters={availableSpotFilters}
+          activeFilters={activeSpotFilters}
+          selectedSpotId={selectedSpotId}
+          isLoading={isLoadingSpots}
+          source={spotSource}
+          error={spotError}
+          onToggleFilter={(group, value) => {
+            setActiveSpotFilters((currentFilters) =>
+              toggleSpotFilter(currentFilters, group, value),
+            );
+          }}
+          onClearFilters={() =>
+            setActiveSpotFilters({
+              phases: [],
+              locationTypes: [],
+              features: [],
+            })
+          }
+          onSelectSpot={toggleSelectedSpot}
+        />
       </div>
 
-      {/* Aggregate banner — visible once ≥2 markers have predictions */}
-      {dayStats && <DayStatsBanner stats={dayStats} />}
-
-      {/* Map */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="relative overflow-hidden rounded-md border border-[#d9c8b6] bg-[#fffaf2] shadow-sm dark:border-[#3f3933] dark:bg-[#211f1c]">
+      {/* MAP (output) — main column on desktop (h-full), below the rail on mobile */}
+      <div className="nf-panel overflow-hidden lg:order-1 lg:h-full">
+        <div className="relative h-[52vh] min-h-[320px] bg-[#fffaf2] dark:bg-[#211f1c] lg:h-full">
         <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""}>
           <Map
             style={mapContainerStyle}
@@ -619,12 +693,18 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
                   key={spot.id}
                   position={{ lat: spot.latitude, lng: spot.longitude }}
                   onClick={() => toggleSelectedSpot(spot.id)}
+                  // Raise the selected marker above all others so its open
+                  // detail card isn't covered by neighbouring markers.
+                  zIndex={isSelected ? SELECTED_SPOT_Z_INDEX : undefined}
                 >
                   <SunsetSpotMarker
                     spot={spot}
                     isSelected={isSelected}
                     canAddMarker={markers.length < 5}
                     onAddSpot={addSpotToMarkers}
+                    // Marker in the upper half of the map → open the popup
+                    // downward so it isn't clipped by the top edge.
+                    openDownward={center ? spot.latitude > center.lat : false}
                   />
                 </AdvancedMarker>
               );
@@ -640,30 +720,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
             sunsetTime={getSunsetTimeForSelectedDay()}
           />
         )}
-      </div>
-
-      <SunsetSpotsPanel
-        spots={filteredSunsetSpots}
-        availableFilters={availableSpotFilters}
-        activeFilters={activeSpotFilters}
-        selectedSpotId={selectedSpotId}
-        isLoading={isLoadingSpots}
-        source={spotSource}
-        error={spotError}
-        onToggleFilter={(group, value) => {
-          setActiveSpotFilters((currentFilters) =>
-            toggleSpotFilter(currentFilters, group, value),
-          );
-        }}
-        onClearFilters={() =>
-          setActiveSpotFilters({
-            phases: [],
-            locationTypes: [],
-            features: [],
-          })
-        }
-        onSelectSpot={toggleSelectedSpot}
-      />
+        </div>
       </div>
     </div>
   );
@@ -674,11 +731,13 @@ function SunsetSpotMarker({
   isSelected,
   canAddMarker,
   onAddSpot,
+  openDownward,
 }: {
   spot: SunsetSpot;
   isSelected: boolean;
   canAddMarker: boolean;
   onAddSpot: (spot: SunsetSpot) => void;
+  openDownward: boolean;
 }) {
   const MarkerIcon = getSpotMarkerIcon(spot);
   const notableQuality = getSpotMarkerLabel(spot);
@@ -700,7 +759,9 @@ function SunsetSpotMarker({
 
       {isSelected && (
         <div
-          className="absolute bottom-12 z-30 w-60 rounded-md border border-[#e5c0ae] bg-[#fffaf4] p-3 text-[#231b17] shadow-xl dark:border-[#5b4037] dark:bg-[#221a20] dark:text-[#f8ede7]"
+          className={`absolute left-1/2 z-30 w-60 max-w-[80vw] -translate-x-1/2 rounded-md border border-[#e5c0ae] bg-[#fffaf4] p-3 text-[#231b17] shadow-xl dark:border-[#5b4037] dark:bg-[#221a20] dark:text-[#f8ede7] ${
+            openDownward ? "top-full mt-2" : "bottom-full mb-2"
+          }`}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -723,7 +784,7 @@ function SunsetSpotMarker({
               {visibleBadges.map((badge) => (
                 <span
                   key={badge}
-                  className="rounded-full bg-[#f2dfd5] px-2 py-0.5 text-[10px] font-semibold text-[#5d3028] dark:bg-white/10 dark:text-[#f3d4ca]"
+                  className="rounded-full bg-[#f2dfd5] px-2 py-0.5 text-xs font-semibold text-[#5d3028] dark:bg-white/10 dark:text-[#f3d4ca]"
                 >
                   {badge}
                 </span>
@@ -733,6 +794,25 @@ function SunsetSpotMarker({
 
           <div className="mt-2 text-xs text-[#665047] dark:text-[#d9c6bd]">
             Arrive by {formatSpotTime(spot.goldenHour.arriveBy)}
+          </div>
+
+          {/* Belt of Venus suitability — anti-solar (eastern) rose arch */}
+          <div className="mt-2 rounded-md border border-pink-200/70 bg-pink-50/70 p-2 dark:border-pink-400/25 dark:bg-pink-400/10">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-pink-700 dark:text-pink-300">
+                Belt of Venus
+              </span>
+              <span className="text-xs font-semibold text-pink-700 dark:text-pink-300">
+                {Math.round(spot.phaseScores.beltOfVenus)}/100
+              </span>
+            </div>
+            <div className="mt-0.5 text-xs text-[#7a4a3c] dark:text-[#f0c2b0]">
+              Look {bearingToCompass(spot.viewingDirections.antisolarAzimuthDegrees)}
+            </div>
+            <div className="mt-1 text-xs leading-snug text-[#8a6a5c] dark:text-[#d9b3a6]">
+              The rosy arch appears opposite the sunset — wants a clear eastern
+              horizon.
+            </div>
           </div>
 
           <button
@@ -795,17 +875,9 @@ function SunsetSpotsPanel({
         {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
 
-      {(availableFilters.phases.length > 0 ||
-        availableFilters.locationTypes.length > 0 ||
+      {(availableFilters.locationTypes.length > 0 ||
         availableFilters.features.length > 0) && (
         <div className="mb-3 space-y-2">
-          <SpotFilterSection
-            title="Sunset phase"
-            group="phases"
-            options={availableFilters.phases}
-            activeOptions={activeFilters.phases}
-            onToggleFilter={onToggleFilter}
-          />
           <SpotFilterSection
             title="Location type"
             group="locationTypes"
@@ -825,7 +897,7 @@ function SunsetSpotsPanel({
               <button
                 type="button"
                 onClick={onClearFilters}
-                className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground"
+                className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
               >
                 Clear filters
               </button>
@@ -858,6 +930,13 @@ function SunsetSpotsPanel({
                   ? "border-[#a6532d] bg-[#fff4e8] text-[#2b241f] dark:bg-[#33241d] dark:text-[#f7e4d4]"
                   : "border-[#d9c8b6] bg-white/60 hover:bg-[#f5eee5] dark:border-[#3f3933] dark:bg-white/5 dark:hover:bg-white/10"
               }`}
+              // Same standardized wash as the phase cards, keyed on best phase.
+              style={{
+                backgroundImage: phaseCardGradient(
+                  spot.bestPhase,
+                  spot.phaseScores[spot.bestPhase],
+                ),
+              }}
               title={`Show ${spot.name} on the map`}
             >
               <div className="flex items-start justify-between gap-2">
@@ -878,7 +957,7 @@ function SunsetSpotsPanel({
                   </span>
                 </span>
                 <span
-                  className="shrink-0 rounded-full border border-[#e3c5b4] bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-[#6f3a28] dark:border-white/10 dark:bg-white/10 dark:text-[#f0c2b0]"
+                  className="shrink-0 rounded-full border border-[#e3c5b4] bg-white/70 px-2 py-0.5 text-xs font-semibold text-[#6f3a28] dark:border-white/10 dark:bg-white/10 dark:text-[#f0c2b0]"
                   aria-hidden="true"
                 >
                   map
@@ -956,7 +1035,7 @@ function SpotFilterSection({
 
   return (
     <div>
-      <div className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">
+      <div className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
         {title}
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -968,7 +1047,7 @@ function SpotFilterSection({
               key={option}
               type="button"
               onClick={() => onToggleFilter(group, option)}
-              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${
+              className={`rounded-full border px-2 py-0.5 text-xs font-medium transition-colors ${
                   isActive
                     ? "border-[#a6532d] bg-[#efe1d1] text-[#3d3128] dark:bg-[#4b3326] dark:text-[#f7e4d4]"
                     : "border-[#d9c8b6] bg-white/60 text-muted-foreground hover:text-foreground dark:border-[#3f3933] dark:bg-white/5"
@@ -1290,7 +1369,7 @@ function DayStatsBanner({ stats }: { stats: ScoreStats }) {
           style={{ left: `${stats.mean}%` }}
         />
       </div>
-      <div className="mt-1 flex justify-between text-[10px] text-white/40">
+      <div className="mt-1 flex justify-between text-xs text-white/40">
         <span>0</span>
         <span>50</span>
         <span>100</span>

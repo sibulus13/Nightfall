@@ -37,6 +37,19 @@ export interface LocationReferenceImage {
   license?: string;
 }
 
+/**
+ * Terrain-derived view quality in one compass direction, from a range-aware
+ * horizon read (Open-Meteo elevation). All fields are 0-1.
+ * - `clearance`: is the NEAR sightline open enough to see the phenomenon? (a gate)
+ * - `backdrop`:  is there DISTANT relief/silhouette to compose against? (contrast)
+ * - `relief`:    how varied/rugged is the terrain in view? (landscape variety)
+ */
+export interface HorizonProfile {
+  clearance: number;
+  backdrop: number;
+  relief: number;
+}
+
 export interface SunsetLocationCandidate {
   id: string;
   name: string;
@@ -53,6 +66,16 @@ export interface SunsetLocationCandidate {
   photoReferenceCount: number;
   references: LocationReference[];
   referenceImages?: LocationReferenceImage[];
+  /**
+   * Directional view-quality profiles, attached by the async terrain
+   * enrichment step. Absent when terrain lookup was skipped or failed —
+   * the ranker falls back to keyword heuristics in that case.
+   * `west` = sunset azimuth, `east` = anti-solar (Belt of Venus) azimuth.
+   */
+  viewProfiles?: {
+    west?: HorizonProfile;
+    east?: HorizonProfile;
+  };
 }
 
 export interface RankedSunsetLocation extends SunsetLocationCandidate {

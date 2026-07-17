@@ -313,6 +313,41 @@ const CelestialIndicators: React.FC<CelestialIndicatorsProps> = ({
             );
           })()}
 
+        {/* Belt of Venus line (anti-solar: sun azimuth + 180°) */}
+        {celestialPositions.sun &&
+          celestialPositions.sun.altitude > -6 &&
+          (() => {
+            const centerX = viewportDimensions.width / 2;
+            const centerY = viewportDimensions.height / 2;
+            const antisolarAzimuth =
+              (celestialPositions.sun.azimuth + 180) % 360;
+            const distantPoint = getDistantPoint(antisolarAzimuth);
+            // The anti-solar point sits opposite the sun; its altitude is
+            // roughly the negative of the sun's, so use that (clamped) for
+            // the ray length to keep it symmetric with the sun ray.
+            const lineLength = getLineLength(
+              Math.max(0, -celestialPositions.sun.altitude),
+            );
+
+            const startX = centerX;
+            const startY = centerY;
+            const endX = centerX + distantPoint.x * lineLength;
+            const endY = centerY + distantPoint.y * lineLength;
+
+            return (
+              <line
+                x1={startX}
+                y1={startY}
+                x2={endX}
+                y2={endY}
+                stroke="rgba(244, 114, 182, 0.85)"
+                strokeWidth="3"
+                strokeDasharray="6,4"
+                className="drop-shadow-sm"
+              />
+            );
+          })()}
+
         {/* Moon line */}
         {celestialPositions.moon &&
           celestialPositions.moon.altitude > -6 &&
@@ -363,6 +398,32 @@ const CelestialIndicators: React.FC<CelestialIndicatorsProps> = ({
             />
             <div className="absolute -top-10 left-1/2 -translate-x-1/2 transform whitespace-nowrap rounded bg-white/90 px-2 py-1 text-xs font-medium text-yellow-600 shadow-sm">
               Sun {Math.round(celestialPositions.sun.altitude)}°
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Belt of Venus indicator at edge (anti-solar / eastern horizon) */}
+      {celestialPositions.sun && celestialPositions.sun.altitude > -6 && (
+        <div
+          className="absolute -translate-x-1/2 -translate-y-1/2 transform"
+          style={{
+            left: `${viewportDimensions.width / 2 + getEdgeIntersection((celestialPositions.sun.azimuth + 180) % 360).x}px`,
+            top: `${viewportDimensions.height / 2 + getEdgeIntersection((celestialPositions.sun.azimuth + 180) % 360).y}px`,
+          }}
+        >
+          <div className="relative flex flex-col items-center">
+            <div
+              className="h-4 w-4 rounded-full border-2 border-white bg-pink-400 shadow-lg"
+              style={{
+                filter: `drop-shadow(0 0 6px rgba(244, 114, 182, 0.7))`,
+              }}
+            />
+            <div className="absolute -top-11 left-1/2 -translate-x-1/2 transform whitespace-nowrap rounded bg-white/90 px-2 py-1 text-center text-xs font-medium text-pink-600 shadow-sm">
+              Belt of Venus
+              <span className="block text-[10px] font-normal text-gray-500">
+                over Earth&apos;s shadow
+              </span>
             </div>
           </div>
         </div>
