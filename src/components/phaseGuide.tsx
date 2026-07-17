@@ -92,6 +92,43 @@ function bearingForPhase(spot: SunsetSpot, direction: PhaseMeta["direction"]) {
   return null;
 }
 
+interface SpotGroup {
+  spot: SunsetSpot;
+  entries: { phase: PhaseMeta; score: number }[];
+  topScore: number;
+}
+
+/**
+ * Group the phases by their best spot, so a location that wins several phases
+ * shows as ONE card listing them — instead of the same spot repeated per phase.
+ * Cards keep chronological order (the group is ordered by its earliest phase).
+ */
+function groupPhasesBySpot(spots: SunsetSpot[]): SpotGroup[] {
+  const groups = new Map<string, SpotGroup>();
+  const order: string[] = [];
+
+  for (const phase of PHASES) {
+    const best = bestSpotForPhase(spots, phase.key);
+    if (!best) {
+      continue;
+    }
+    const existing = groups.get(best.spot.id);
+    if (existing) {
+      existing.entries.push({ phase, score: best.score });
+      existing.topScore = Math.max(existing.topScore, best.score);
+    } else {
+      groups.set(best.spot.id, {
+        spot: best.spot,
+        entries: [{ phase, score: best.score }],
+        topScore: best.score,
+      });
+      order.push(best.spot.id);
+    }
+  }
+
+  return order.map((id) => groups.get(id)!);
+}
+
 export default function PhaseGuide({
   spots,
   selectedSpotId,
@@ -117,11 +154,13 @@ export default function PhaseGuide({
       return next;
     });
 
+  const spotGroups = groupPhasesBySpot(spots);
+
   return (
     <section className="nf-panel p-3">
       <header className="mb-3">
         <div className="flex items-center gap-2">
-          <div className="nf-section-label">The sunset, phase by phase</div>
+          <div className="nf-section-label">Best sunset spots nearby</div>
           {isRefining && (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -130,8 +169,8 @@ export default function PhaseGuide({
           )}
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Each phase peaks at a different time and wants a different horizon —
-          here&apos;s the best nearby spot for each, in order.
+          Which sunset phases each nearby spot is best for. Tap a spot to show it
+          on the map, or the arrow for details.
         </p>
       </header>
 
@@ -152,54 +191,50 @@ export default function PhaseGuide({
           isLoading ? "opacity-50" : ""
         }`}
       >
-        {PHASES.map((phase) => {
-          const best = bestSpotForPhase(spots, phase.key);
-          const Icon = phase.icon;
-          const bearing = best
-            ? bearingForPhase(best.spot, phase.direction)
-            : null;
-          const isSelected = best?.spot.id === selectedSpotId;
-          const isExpanded = expandedPhases.has(phase.key);
+        {spotGroups.map((group) => {
+          const Icon = group.entries[0]!.phase.icon;
+          const isSelected = group.spot.id === selectedSpotId;
+          const isExpanded = expandedPhases.has(group.spot.id);
+          const phaseSummary = group.entries
+            .map((entry) => entry.phase.label)
+            .join(" · ");
 
           return (
             <li
-              key={phase.key}
+              key={group.spot.id}
               className={`overflow-hidden rounded-md border bg-background/50 ${
                 isSelected ? "border-[#a6532d]" : "border-border"
               }`}
             >
               <div className="flex items-center gap-1.5 p-2">
-                {/* Whole row selects this phase's best spot on the map */}
+                {/* Whole row shows this spot on the map */}
                 <button
                   type="button"
-                  onClick={() => best && onSelectSpot(best.spot.id)}
-                  disabled={!best}
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
-                  title={best ? `Show ${best.spot.name} on the map` : undefined}
+                  onClick={() => onSelectSpot(group.spot.id)}
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  title={`Show ${group.spot.name} on the map`}
                 >
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 via-pink-500 to-violet-600 text-white shadow-sm">
                     <Icon className="h-[15px] w-[15px]" aria-hidden="true" />
                   </span>
-                  <span className="shrink-0 text-sm font-semibold text-foreground">
-                    {phase.label}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                    {best
-                      ? `${best.spot.name}${bearing ? ` · ${bearing}` : ""}`
-                      : "No spots yet"}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-foreground">
+                      {group.spot.name}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {phaseSummary}
+                    </span>
                   </span>
                 </button>
-                {best && (
-                  <span className="nf-score shrink-0" title="Phase fit score">
-                    {best.score}
-                  </span>
-                )}
+                <span className="nf-score shrink-0" title="Best phase-fit score">
+                  {group.topScore}
+                </span>
                 <button
                   type="button"
-                  onClick={() => toggleExpanded(phase.key)}
+                  onClick={() => toggleExpanded(group.spot.id)}
                   className="nf-icon-button h-7 w-7 shrink-0"
                   aria-expanded={isExpanded}
-                  aria-label={`${isExpanded ? "Hide" : "Show"} ${phase.label} details`}
+                  aria-label={`${isExpanded ? "Hide" : "Show"} ${group.spot.name} details`}
                 >
                   <ChevronDown
                     className={`h-4 w-4 transition-transform ${
@@ -210,17 +245,40 @@ export default function PhaseGuide({
               </div>
 
               {isExpanded && (
-                <div className="border-t border-border px-2.5 py-2 text-xs leading-snug text-muted-foreground">
-                  <span className="font-medium text-foreground">
-                    {phase.when}
-                  </span>
-                  {" — "}
-                  {phase.blurb}
-                </div>
+                <ul className="border-t border-border">
+                  {group.entries.map((entry) => {
+                    const bearing = bearingForPhase(
+                      group.spot,
+                      entry.phase.direction,
+                    );
+                    return (
+                      <li
+                        key={entry.phase.key}
+                        className="border-b border-border/60 px-2.5 py-2 text-xs leading-snug text-muted-foreground last:border-b-0"
+                      >
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="font-semibold text-foreground">
+                            {entry.phase.label}
+                          </span>
+                          <span className="shrink-0">
+                            {entry.phase.when}
+                            {bearing ? ` · Look ${bearing}` : ""}
+                          </span>
+                        </div>
+                        <p className="mt-0.5">{entry.phase.blurb}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </li>
           );
         })}
+        {spotGroups.length === 0 && !isLoading && (
+          <li className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
+            No spots scouted here yet.
+          </li>
+        )}
       </ol>
       )}
     </section>
