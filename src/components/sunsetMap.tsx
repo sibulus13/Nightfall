@@ -696,6 +696,9 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
                     isSelected={isSelected}
                     canAddMarker={markers.length < 5}
                     onAddSpot={addSpotToMarkers}
+                    // Marker in the upper half of the map → open the popup
+                    // downward so it isn't clipped by the top edge.
+                    openDownward={center ? spot.latitude > center.lat : false}
                   />
                 </AdvancedMarker>
               );
@@ -722,11 +725,13 @@ function SunsetSpotMarker({
   isSelected,
   canAddMarker,
   onAddSpot,
+  openDownward,
 }: {
   spot: SunsetSpot;
   isSelected: boolean;
   canAddMarker: boolean;
   onAddSpot: (spot: SunsetSpot) => void;
+  openDownward: boolean;
 }) {
   const MarkerIcon = getSpotMarkerIcon(spot);
   const notableQuality = getSpotMarkerLabel(spot);
@@ -748,7 +753,9 @@ function SunsetSpotMarker({
 
       {isSelected && (
         <div
-          className="absolute bottom-12 z-30 w-60 rounded-md border border-[#e5c0ae] bg-[#fffaf4] p-3 text-[#231b17] shadow-xl dark:border-[#5b4037] dark:bg-[#221a20] dark:text-[#f8ede7]"
+          className={`absolute left-1/2 z-30 w-60 max-w-[80vw] -translate-x-1/2 rounded-md border border-[#e5c0ae] bg-[#fffaf4] p-3 text-[#231b17] shadow-xl dark:border-[#5b4037] dark:bg-[#221a20] dark:text-[#f8ede7] ${
+            openDownward ? "top-full mt-2" : "bottom-full mb-2"
+          }`}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
