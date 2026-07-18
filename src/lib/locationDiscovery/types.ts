@@ -76,6 +76,15 @@ export interface SunsetLocationCandidate {
     west?: HorizonProfile;
     east?: HorizonProfile;
   };
+  /**
+   * Human-curated popularity from Google Places (rating 0-5 + review count).
+   * Present only for `google-places` candidates; boosts ranking so well-known
+   * spots (e.g. famous viewpoints) surface above generic tagged POIs.
+   */
+  popularity?: {
+    rating: number;
+    count: number;
+  };
 }
 
 export interface RankedSunsetLocation extends SunsetLocationCandidate {

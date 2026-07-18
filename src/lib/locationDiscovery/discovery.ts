@@ -4,6 +4,7 @@ import {
   fetchOverpassSunsetCandidates,
   OverpassRequestError,
 } from "./overpass";
+import { fetchGooglePlacesCandidates } from "./places";
 import { rankSunsetLocation } from "./ranking";
 import { enrichCandidatesWithTerrain } from "./terrain";
 import {
@@ -151,21 +152,25 @@ async function fetchLiveCandidates(
       radiusMeters,
     },
   ];
-  // Run the passes concurrently — serial failover across passes was the main
-  // latency sink (each slow Overpass pass stacked on the previous one).
-  const passResults = await Promise.allSettled(
-    passes.map((pass) =>
-      fetchOverpassSunsetCandidates(
-        center.latitude,
-        center.longitude,
-        pass.radiusMeters,
-        limit * 4,
-        pass.name,
+  // Overpass passes (concurrently) + Google Places (popularity source) all run
+  // in parallel. Serial failover across Overpass passes was the main latency sink.
+  const [passResults, placesCandidates] = await Promise.all([
+    Promise.allSettled(
+      passes.map((pass) =>
+        fetchOverpassSunsetCandidates(
+          center.latitude,
+          center.longitude,
+          pass.radiusMeters,
+          limit * 4,
+          pass.name,
+        ),
       ),
     ),
-  );
+    fetchGooglePlacesCandidates(center.latitude, center.longitude, radiusMeters),
+  ]);
 
-  const candidates: SunsetLocationCandidate[] = [];
+  // Places candidates go in first so their popularity survives the dedupe merge.
+  const candidates: SunsetLocationCandidate[] = [...placesCandidates];
   passResults.forEach((result, index) => {
     if (result.status === "fulfilled") {
       candidates.push(...result.value);
@@ -244,6 +249,8 @@ function dedupeCandidates(
         existingCandidate.photoReferenceCount,
         candidate.photoReferenceCount,
       ),
+      // Keep the Google Places popularity when an OSM + Places spot merge.
+      popularity: candidate.popularity ?? existingCandidate.popularity,
     });
   });
 
