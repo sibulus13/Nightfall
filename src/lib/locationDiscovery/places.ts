@@ -124,9 +124,9 @@ function mapPlaceToCandidate(
 
 function inferKind(types: string[], name: string): CandidateKind {
   const haystack = `${types.join(" ")} ${name}`.toLowerCase();
-  if (/beach/.test(haystack)) return "beach";
+  if (haystack.includes("beach")) return "beach";
   if (/pier|marina|harbou?r|waterfront/.test(haystack)) return "waterfront";
-  if (/lighthouse/.test(haystack)) return "lighthouse";
+  if (haystack.includes("lighthouse")) return "lighthouse";
   if (/peak|mountain|hill|summit|ridge|cliff/.test(haystack)) return "elevated-park";
   if (/trail|path/.test(haystack)) return "trail";
   if (/park|garden/.test(haystack)) return "park";

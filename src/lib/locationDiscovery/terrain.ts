@@ -235,17 +235,29 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// suncalc's runtime typings resolve to `any` in the lint/build context, so
+// pin the two functions we use to explicit signatures — this makes the calls
+// type-safe (no-unsafe-call) instead of only casting their results.
+const getSunsetTimes = getTimes as (
+  date: Date,
+  latitude: number,
+  longitude: number,
+) => { sunset: Date };
+const getSunPosition = getPosition as (
+  date: Date,
+  latitude: number,
+  longitude: number,
+) => { azimuth: number };
+
 function getSunsetAzimuthDegrees(origin: Coordinate): number {
   // Reference date is fine — the sunset azimuth moves slowly and horizon
   // geometry is static; we only need the compass direction to sample along.
-  const times = getTimes(new Date(), origin.latitude, origin.longitude) as {
-    sunset: Date;
-  };
-  const position = getPosition(
+  const times = getSunsetTimes(new Date(), origin.latitude, origin.longitude);
+  const position = getSunPosition(
     times.sunset,
     origin.latitude,
     origin.longitude,
-  ) as { azimuth: number };
+  );
 
   // suncalc azimuth is measured from due south, clockwise; +180 → compass north.
   const compass = position.azimuth * (180 / Math.PI) + 180;
