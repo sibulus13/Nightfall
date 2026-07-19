@@ -46,3 +46,5 @@ yarn-error.log*
 .idea
 
 .claude
+# local session memory (not app code)
+.remember/
