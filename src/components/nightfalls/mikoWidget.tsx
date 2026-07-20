@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Sparkles, Send, X, Sunset } from "lucide-react";
 
 /**
@@ -237,12 +237,12 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         <div
           className={
             isUser
-              ? "rounded-2xl rounded-br-sm px-3 py-2 text-sm text-white"
-              : "whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-border bg-muted/50 px-3 py-2 text-sm text-foreground"
+              ? "whitespace-pre-wrap rounded-2xl rounded-br-sm px-3 py-2 text-sm text-white"
+              : "rounded-2xl rounded-bl-sm border border-border bg-muted/50 px-3 py-2 text-sm text-foreground"
           }
           style={isUser ? { background: MIKO_GRADIENT } : undefined}
         >
-          {message.content}
+          {isUser ? message.content : <MarkdownMessage text={message.content} />}
         </div>
         {message.toolsUsed && message.toolsUsed.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1 px-1">
@@ -259,6 +259,94 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       </div>
     </div>
   );
+}
+
+// Minimal Markdown renderer for Miko's replies — links, **bold**, _muted_, and
+// `- ` lines as tappable cards. Dependency-free and safe (no dangerouslySetHTML);
+// the input format is the tool output we control.
+const INLINE_TOKEN = /\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|_([^_]+)_/g;
+
+function renderInline(text: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const regex = new RegExp(INLINE_TOKEN);
+  let lastIndex = 0;
+  let token = 0;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+    const key = `${keyPrefix}-${token}`;
+    if (match[1] !== undefined && match[2] !== undefined) {
+      nodes.push(
+        <a
+          key={key}
+          href={match[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-orange-600 underline decoration-orange-300 underline-offset-2 hover:text-orange-500 dark:text-orange-300"
+        >
+          {renderInline(match[1], key)}
+        </a>,
+      );
+    } else if (match[3] !== undefined) {
+      nodes.push(<strong key={key}>{match[3]}</strong>);
+    } else if (match[4] !== undefined) {
+      nodes.push(
+        <span key={key} className="text-muted-foreground">
+          {match[4]}
+        </span>,
+      );
+    }
+    lastIndex = regex.lastIndex;
+    token += 1;
+  }
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+  return nodes;
+}
+
+function MarkdownMessage({ text }: { text: string }) {
+  const lines = text.split("\n");
+  const blocks: ReactNode[] = [];
+  let listItems: string[] = [];
+
+  const flushList = (key: string) => {
+    if (listItems.length === 0) return;
+    const items = listItems;
+    listItems = [];
+    blocks.push(
+      <div key={key} className="space-y-1.5">
+        {items.map((item, index) => (
+          <div
+            key={index}
+            className="rounded-lg border border-border bg-background/60 px-3 py-2 leading-snug"
+          >
+            {renderInline(item, `${key}-${index}`)}
+          </div>
+        ))}
+      </div>,
+    );
+  };
+
+  lines.forEach((line, index) => {
+    if (line.startsWith("- ")) {
+      listItems.push(line.slice(2));
+      return;
+    }
+    flushList(`list-${index}`);
+    if (line.trim() !== "") {
+      blocks.push(
+        <p key={`p-${index}`} className="leading-snug">
+          {renderInline(line, `p-${index}`)}
+        </p>,
+      );
+    }
+  });
+  flushList("list-end");
+
+  return <div className="space-y-2">{blocks}</div>;
 }
 
 function TypingIndicator() {

@@ -39,18 +39,50 @@ const PHASE_LABELS: Record<RankedSunsetLocation["bestPhase"], string> = {
   blueHour: "blue hour",
 };
 
-function verdict(score: number): string {
-  if (score >= 80) return "exceptional";
-  if (score >= 65) return "great";
-  if (score >= 50) return "good";
-  if (score >= 35) return "fair";
-  return "poor";
+const SITE_URL = "https://www.nightfalls.ca";
+
+// Qualitative band leads the answer — a number like "86/100" isn't intuitive on
+// its own. An extra top band ("Pristine") separates the clustered high scores a
+// plain "exceptional" would flatten together.
+function qualityLabel(score: number): string {
+  if (score >= 85) return "Pristine";
+  if (score >= 70) return "Exceptional";
+  if (score >= 55) return "Great";
+  if (score >= 40) return "Good";
+  if (score >= 25) return "Fair";
+  return "Poor";
 }
 
 function dayLabel(index: number, sunsetTime: string): string {
   if (index === 0) return "Tonight";
   if (index === 1) return "Tomorrow";
-  return sunsetTime.split("T")[0] ?? `Day ${index + 1}`;
+  const datePart = sunsetTime.split("T")[0];
+  if (!datePart) {
+    return `Day ${index + 1}`;
+  }
+  // Anchor at midday so the weekday/date can't roll over a timezone boundary.
+  return new Date(`${datePart}T12:00:00`).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+// Deep link to the planner centered on a location, so each card opens the app
+// at exactly that spot/place.
+function plannerLink(
+  latitude: number,
+  longitude: number,
+  options?: { predictions?: boolean },
+): string {
+  const params = new URLSearchParams({
+    lat: latitude.toFixed(4),
+    lon: longitude.toFixed(4),
+  });
+  if (options?.predictions) {
+    params.set("tab", "predictions");
+  }
+  return `${SITE_URL}/App?${params.toString()}`;
 }
 
 async function findSunsetSpots(location: string): Promise<string> {
@@ -69,32 +101,28 @@ async function findSunsetSpots(location: string): Promise<string> {
     }),
   ]);
 
-  const lines: string[] = [
-    `Near ${geo.name}${geo.admin1 ? `, ${geo.admin1}` : ""}:`,
-  ];
+  const place = `${geo.name}${geo.admin1 ? `, ${geo.admin1}` : ""}`;
   const tonight = prediction?.[0];
-  if (tonight) {
-    lines.push(
-      `Tonight's sky quality: ${Math.round(tonight.score)}/100 (${verdict(
-        tonight.score,
-      )}).`,
-    );
-  }
+  const lines: string[] = [
+    tonight
+      ? `**Sunset spots near ${geo.name}** · tonight looks **${qualityLabel(
+          tonight.score,
+        )}** _(${Math.round(tonight.score)}/100)_`
+      : `**Sunset spots near ${place}**`,
+    "",
+  ];
+
   if (discovery.candidates.length === 0) {
     lines.push("No standout viewing spots found nearby.");
   } else {
-    lines.push("", "Best spots to watch from:");
-    discovery.candidates.slice(0, SPOT_RESULT_LIMIT).forEach((spot, i) => {
-      const popular = spot.qualificationBadges.includes("Popular")
-        ? " [Popular]"
-        : "";
-      const rating = spot.popularity
-        ? ` — ${spot.popularity.rating}★ (${spot.popularity.count} reviews)`
-        : "";
+    discovery.candidates.slice(0, SPOT_RESULT_LIMIT).forEach((spot) => {
+      const popular = spot.qualificationBadges.includes("Popular") ? " 🔥" : "";
+      const rating = spot.popularity ? ` · ${spot.popularity.rating}★` : "";
+      const link = plannerLink(spot.latitude, spot.longitude);
       lines.push(
-        `${i + 1}. ${spot.name}${popular} — best for ${
+        `- [**${spot.name}**${popular} — best for ${
           PHASE_LABELS[spot.bestPhase]
-        }${rating}`,
+        }${rating}](${link})`,
       );
     });
   }
@@ -114,26 +142,22 @@ async function sunsetForecast(location: string): Promise<string> {
     return `No sunset forecast available for ${geo.name}.`;
   }
 
-  const lines: string[] = [`Sunset-quality forecast near ${geo.name}:`];
-  predictions.forEach((prediction, index) => {
-    lines.push(
-      `• ${dayLabel(index, prediction.sunset_time)}: ${Math.round(
-        prediction.score,
-      )}/100 (${verdict(prediction.score)})`,
-    );
-  });
   const bestIndex = predictions.reduce(
     (best, prediction, index, all) =>
       prediction.score > all[best]!.score ? index : best,
     0,
   );
-  lines.push(
-    "",
-    `Best upcoming evening: ${dayLabel(
-      bestIndex,
-      predictions[bestIndex]!.sunset_time,
-    )} at ${Math.round(predictions[bestIndex]!.score)}/100.`,
-  );
+
+  const lines: string[] = [`**Sunset forecast — ${geo.name}**`, ""];
+  predictions.forEach((prediction, index) => {
+    const best = index === bestIndex ? " · ⭐ best this week" : "";
+    const link = plannerLink(geo.latitude, geo.longitude, { predictions: true });
+    lines.push(
+      `- [**${dayLabel(index, prediction.sunset_time)}** — ${qualityLabel(
+        prediction.score,
+      )} _(${Math.round(prediction.score)}/100)_${best}](${link})`,
+    );
+  });
   return lines.join("\n");
 }
 
