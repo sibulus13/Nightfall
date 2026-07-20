@@ -24,9 +24,6 @@ const SYSTEM_PROMPT = [
   "When a user asks about a location, pass the place name to the tool exactly as they said it.",
   "Keep replies warm, concise, and skimmable. Prefer short paragraphs or tight bullet lists.",
   "If you don't have a place to work with, ask for one. Never fabricate scores or spot names.",
-  "Tools return Markdown with links — present those results preserving the Markdown",
-  "list items and links EXACTLY; never rewrite, shorten, or drop a URL. You may add a",
-  "short sentence before or after, but keep the cards intact.",
 ].join(" ");
 
 interface ChatMessage {

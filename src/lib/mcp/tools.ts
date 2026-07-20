@@ -39,8 +39,6 @@ const PHASE_LABELS: Record<RankedSunsetLocation["bestPhase"], string> = {
   blueHour: "blue hour",
 };
 
-const SITE_URL = "https://www.nightfalls.ca";
-
 // Qualitative band leads the answer — a number like "86/100" isn't intuitive on
 // its own. An extra top band ("Pristine") separates the clustered high scores a
 // plain "exceptional" would flatten together.
@@ -68,23 +66,6 @@ function dayLabel(index: number, sunsetTime: string): string {
   });
 }
 
-// Deep link to the planner centered on a location, so each card opens the app
-// at exactly that spot/place.
-function plannerLink(
-  latitude: number,
-  longitude: number,
-  options?: { predictions?: boolean },
-): string {
-  const params = new URLSearchParams({
-    lat: latitude.toFixed(4),
-    lon: longitude.toFixed(4),
-  });
-  if (options?.predictions) {
-    params.set("tab", "predictions");
-  }
-  return `${SITE_URL}/App?${params.toString()}`;
-}
-
 async function findSunsetSpots(location: string): Promise<string> {
   const geo = await geocodePlace(location);
   if (!geo) {
@@ -105,24 +86,22 @@ async function findSunsetSpots(location: string): Promise<string> {
   const tonight = prediction?.[0];
   const lines: string[] = [
     tonight
-      ? `**Sunset spots near ${geo.name}** · tonight looks **${qualityLabel(
+      ? `Sunset spots near ${geo.name} — tonight looks ${qualityLabel(
           tonight.score,
-        )}** _(${Math.round(tonight.score)}/100)_`
-      : `**Sunset spots near ${place}**`,
-    "",
+        )}:`
+      : `Sunset spots near ${place}:`,
   ];
 
   if (discovery.candidates.length === 0) {
     lines.push("No standout viewing spots found nearby.");
   } else {
-    discovery.candidates.slice(0, SPOT_RESULT_LIMIT).forEach((spot) => {
+    discovery.candidates.slice(0, SPOT_RESULT_LIMIT).forEach((spot, i) => {
       const popular = spot.qualificationBadges.includes("Popular") ? " 🔥" : "";
-      const rating = spot.popularity ? ` · ${spot.popularity.rating}★` : "";
-      const link = plannerLink(spot.latitude, spot.longitude);
+      const rating = spot.popularity ? ` (${spot.popularity.rating}★)` : "";
       lines.push(
-        `- [**${spot.name}**${popular} — best for ${
+        `${i + 1}. ${spot.name}${popular} — best for ${
           PHASE_LABELS[spot.bestPhase]
-        }${rating}](${link})`,
+        }${rating}`,
       );
     });
   }
@@ -148,14 +127,13 @@ async function sunsetForecast(location: string): Promise<string> {
     0,
   );
 
-  const lines: string[] = [`**Sunset forecast — ${geo.name}**`, ""];
+  const lines: string[] = [`Sunset forecast near ${geo.name}:`];
   predictions.forEach((prediction, index) => {
-    const best = index === bestIndex ? " · ⭐ best this week" : "";
-    const link = plannerLink(geo.latitude, geo.longitude, { predictions: true });
+    const star = index === bestIndex ? " ⭐ best this week" : "";
     lines.push(
-      `- [**${dayLabel(index, prediction.sunset_time)}** — ${qualityLabel(
+      `• ${dayLabel(index, prediction.sunset_time)} — ${qualityLabel(
         prediction.score,
-      )} _(${Math.round(prediction.score)}/100)_${best}](${link})`,
+      )}${star}`,
     );
   });
   return lines.join("\n");
