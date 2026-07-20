@@ -258,6 +258,20 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       return;
     }
 
+    const cacheKey = getSunsetSpotCacheKey(center);
+
+    // Instant cache hit — apply synchronously with no debounce and no loading
+    // flash, so revisiting a nearby area (or toggling back to the map tab)
+    // reuses the same recommendations immediately instead of re-fetching.
+    const cachedResponse = getCachedSunsetSpotResponse(cacheKey);
+    if (cachedResponse) {
+      applySunsetSpotResponse(cachedResponse);
+      setIsLoadingSpots(false);
+      setIsRefiningSpots(false);
+      setSpotError(null);
+      return;
+    }
+
     const abortController = new AbortController();
     const signal = abortController.signal;
 
@@ -286,15 +300,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     const loadSpots = async () => {
       setIsLoadingSpots(true);
       setSpotError(null);
-
-      const cacheKey = getSunsetSpotCacheKey(center);
-      const cachedResponse = getCachedSunsetSpotResponse(cacheKey);
-      if (cachedResponse) {
-        applySunsetSpotResponse(cachedResponse);
-        setIsLoadingSpots(false);
-        setIsRefiningSpots(false);
-        return;
-      }
 
       // New location → drop the previous location's spots so every component
       // (phase guide, spot list, map pins) shows its own loading state instead
