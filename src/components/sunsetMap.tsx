@@ -65,12 +65,17 @@ const mapContainerStyle = {
 const SUNSET_SPOT_RADIUS_METERS = 20000;
 const SUNSET_SPOT_LIMIT = 12;
 const SUNSET_SPOT_CACHE_TTL_MS = 15 * 60 * 1000;
-const SUNSET_SPOT_CACHE_KEY_PREFIX = "sunset-app-spot-cache-v2";
+const SUNSET_SPOT_CACHE_KEY_PREFIX = "sunset-app-spot-cache-v3";
+// Cache bucket size. Snap the search center to a uniform grid this many metres
+// wide so a revisit within one cell reuses the cached result. Coarse on purpose
+// — the search radius is 20km, so ~1km buckets barely change the result set.
+const SPOT_CACHE_CELL_METERS = 1000;
+const METERS_PER_DEGREE_LAT = 111_320;
 const MAP_SETTLE_DELAY_MS = 900;
 const MIN_RECOMMENDATION_MOVE_METERS = 900;
-// Keep the current recommendations while at least this many remain visible in
-// the viewport — panning that still shows recs shouldn't trigger a re-fetch.
-const MIN_RECOMMENDATIONS_IN_VIEW = 2;
+// Keep the current recommendations while at least this FRACTION of them remains
+// visible in the viewport; re-fetch once most have panned off the map.
+const RECOMMENDATION_COVERAGE_RATIO = 0.5;
 // Selected spot marker sits above all others so its detail card isn't covered.
 const SELECTED_SPOT_Z_INDEX = 1000;
 
@@ -482,14 +487,16 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
           return;
         }
 
-        // Content-aware stickiness: if the current recommendations still cover
-        // the viewport (a couple remain visible), keep them — moving the center
-        // isn't a reason to re-fetch while the user can still see recs. This is
+        // Content-aware stickiness: keep the current recommendations while at
+        // least half of them are still inside the viewport. Re-fetch only once
+        // you've panned far enough that most recs have scrolled off the map —
         // zoom-aware where a fixed distance is not.
+        const currentSpots = sunsetSpotsRef.current;
         if (
           nextBounds &&
-          countSpotsInBounds(sunsetSpotsRef.current, nextBounds) >=
-            MIN_RECOMMENDATIONS_IN_VIEW
+          currentSpots.length > 0 &&
+          countSpotsInBounds(currentSpots, nextBounds) >=
+            currentSpots.length * RECOMMENDATION_COVERAGE_RATIO
         ) {
           return;
         }
@@ -1342,10 +1349,19 @@ function countSpotsInBounds(
 }
 
 function getSunsetSpotCacheKey(center: { lat: number; lng: number }): string {
+  // Snap to a uniform ~1km grid measured in metres (not raw degrees, whose
+  // cells distort toward the poles). Longitude metres-per-degree shrink with
+  // latitude, so scale the longitude step by cos(lat); clamp near the poles to
+  // avoid divide-by-zero.
+  const latStep = SPOT_CACHE_CELL_METERS / METERS_PER_DEGREE_LAT;
+  const cosLat = Math.max(Math.cos((center.lat * Math.PI) / 180), 0.01);
+  const lngStep = SPOT_CACHE_CELL_METERS / (METERS_PER_DEGREE_LAT * cosLat);
+  const snappedLat = Math.round(center.lat / latStep) * latStep;
+  const snappedLng = Math.round(center.lng / lngStep) * lngStep;
   return [
     SUNSET_SPOT_CACHE_KEY_PREFIX,
-    center.lat.toFixed(3),
-    center.lng.toFixed(3),
+    snappedLat.toFixed(4),
+    snappedLng.toFixed(4),
     SUNSET_SPOT_RADIUS_METERS,
     SUNSET_SPOT_LIMIT,
   ].join(":");
