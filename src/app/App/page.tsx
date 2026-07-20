@@ -168,6 +168,7 @@ export default function AppPage() {
     isRateLimited,
     rateLimitMessage,
     currentLocation: mapLocation,
+    currentLocationName: mapLocationName,
     availableDates,
   } = useSelector(
     (state: {
@@ -175,6 +176,7 @@ export default function AppPage() {
         isRateLimited: boolean;
         rateLimitMessage: string;
         currentLocation: { lat: number; lng: number } | null;
+        currentLocationName: string | null;
         availableDates: string[];
       };
     }) => state.map,
@@ -315,10 +317,16 @@ export default function AppPage() {
         predict({ lat: mapLocation.lat, lon: mapLocation.lng }).catch(
           console.error,
         );
-        // Get location name
-        void getLocationName(mapLocation.lat, mapLocation.lng).then((name) => {
-          if (name) setLocationName(name);
-        });
+        // Prefer the name carried from the user's selection so the search bar
+        // fills in immediately; only reverse-geocode as a fallback (that call
+        // is also referrer-restricted and can fail on non-prod origins).
+        if (mapLocationName) {
+          setLocationName(mapLocationName);
+        } else {
+          void getLocationName(mapLocation.lat, mapLocation.lng).then((name) => {
+            if (name) setLocationName(name);
+          });
+        }
       } else {
         // Fall back to localStorage
         const lat = Number(localStorage.getItem("lat"));
@@ -341,7 +349,14 @@ export default function AppPage() {
 
     // Mark as initialized after the first run
     setIsInitialized(true);
-  }, [currentLocation.lat, currentLocation.lng, dispatch, mapLocation, predict]);
+  }, [
+    currentLocation.lat,
+    currentLocation.lng,
+    dispatch,
+    mapLocation,
+    mapLocationName,
+    predict,
+  ]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

@@ -76,6 +76,10 @@ interface MapState {
   availableDates: string[];
   selectedDayIndex: number;
   currentLocation: { lat: number; lng: number } | null;
+  // Human-readable name of the current location, carried from the place the
+  // user selected so the search bar can reflect it immediately without a
+  // reverse-geocode round-trip (which is also referrer-restricted).
+  currentLocationName: string | null;
   isRateLimited: boolean;
   rateLimitMessage: string;
   cachedLocations: string[];
@@ -114,11 +118,14 @@ const getDefaultInitialState = (): MapState => ({
   availableDates: [],
   selectedDayIndex: 0,
   currentLocation: null,
+  currentLocationName: null,
   isRateLimited: false,
   rateLimitMessage: "",
   cachedLocations: [],
   dayStats: null,
 });
+
+const LOCATION_NAME_STORAGE_KEY = "sunset-app-last-location-name";
 
 const initialState: MapState = getDefaultInitialState();
 
@@ -377,13 +384,17 @@ export const mapSlice = createSlice({
     },
     setCurrentLocation: (
       state,
-      action: { payload: { lat: number; lng: number } },
+      action: { payload: { lat: number; lng: number; name?: string } },
     ) => {
-      state.currentLocation = action.payload;
+      const { lat, lng, name } = action.payload;
+      const coordinates = { lat, lng };
+      state.currentLocation = coordinates;
+      state.currentLocationName = name ?? null;
 
       // Save to localStorage
-      saveToLocalStorage("sunset-app-last-location", action.payload);
-      saveBrowserLocationPreference(action.payload);
+      saveToLocalStorage("sunset-app-last-location", coordinates);
+      saveToLocalStorage(LOCATION_NAME_STORAGE_KEY, name ?? null);
+      saveBrowserLocationPreference(coordinates);
     },
     resetMap: (state) => {
       state.markers = [];
@@ -393,6 +404,7 @@ export const mapSlice = createSlice({
       state.availableDates = [];
       state.selectedDayIndex = 0;
       state.currentLocation = null;
+      state.currentLocationName = null;
       state.isRateLimited = false;
       state.rateLimitMessage = "";
       state.cachedLocations = [];
@@ -423,9 +435,13 @@ export const mapSlice = createSlice({
             string,
             Prediction | null
           >) || {};
+        const savedLocationName = loadFromLocalStorage(
+          LOCATION_NAME_STORAGE_KEY,
+        ) as string | null;
 
         state.markers = savedMarkers;
         state.currentLocation = savedLocation;
+        state.currentLocationName = savedLocationName;
         state.predictions = savedPredictions;
       }
     },
