@@ -67,12 +67,12 @@ const SUNSET_SPOT_LIMIT = 12;
 const SUNSET_SPOT_CACHE_TTL_MS = 15 * 60 * 1000;
 const SUNSET_SPOT_CACHE_KEY_PREFIX = "sunset-app-spot-cache-v3";
 // Cache bucket size. Snap the search center to a uniform grid this many metres
-// wide so a revisit within one cell reuses the cached result. Coarse on purpose
-// — the search radius is 20km, so ~1km buckets barely change the result set.
-const SPOT_CACHE_CELL_METERS = 1000;
+// wide so a revisit/reload within one cell reuses the cached result. Kept small
+// so it only dedupes near-identical centers — a coarse bucket would otherwise
+// swallow a coverage-triggered re-fetch and return stale same-cell recs.
+const SPOT_CACHE_CELL_METERS = 250;
 const METERS_PER_DEGREE_LAT = 111_320;
 const MAP_SETTLE_DELAY_MS = 900;
-const MIN_RECOMMENDATION_MOVE_METERS = 900;
 // Keep the current recommendations while at least this FRACTION of them remains
 // visible in the viewport; re-fetch once most have panned off the map.
 const RECOMMENDATION_COVERAGE_RATIO = 0.5;
@@ -123,7 +123,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   const mapSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
-  const lastRecommendationCenterRef = useRef(initialLocation);
   // Latest recommendations, readable inside the debounced map-settle callback
   // without re-binding the map event handler on every spot change.
   const sunsetSpotsRef = useRef(sunsetSpots);
@@ -242,7 +241,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     if (initialLocation) {
       setCenter(initialLocation);
       setQueryCenter(initialLocation);
-      lastRecommendationCenterRef.current = initialLocation;
     }
   }, [initialLocation]);
 
@@ -472,25 +470,10 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       }
 
       mapSettleTimeoutRef.current = setTimeout(() => {
-        const lastRecommendationCenter = lastRecommendationCenterRef.current;
-        const movedMeters = lastRecommendationCenter
-          ? getDistance(
-              lastRecommendationCenter.lat,
-              lastRecommendationCenter.lng,
-              nextCenter.lat,
-              nextCenter.lng,
-            )
-          : MIN_RECOMMENDATION_MOVE_METERS;
-
-        // Jitter floor — ignore sub-threshold nudges regardless of coverage.
-        if (movedMeters < MIN_RECOMMENDATION_MOVE_METERS) {
-          return;
-        }
-
-        // Content-aware stickiness: keep the current recommendations while at
-        // least half of them are still inside the viewport. Re-fetch only once
-        // you've panned far enough that most recs have scrolled off the map —
-        // zoom-aware where a fixed distance is not.
+        // Re-fetch purely on viewport coverage: keep the current recommendations
+        // while at least half of them remain inside the viewport, and re-fetch
+        // once most have panned off the map. Zoom-aware where a fixed distance
+        // is not, and no separate move threshold to fight it.
         const currentSpots = sunsetSpotsRef.current;
         if (
           nextBounds &&
@@ -501,7 +484,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
           return;
         }
 
-        lastRecommendationCenterRef.current = nextCenter;
         setQueryCenter(nextCenter);
         dispatch(setCurrentLocation(nextCenter));
 
