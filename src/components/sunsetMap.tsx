@@ -68,6 +68,9 @@ const SUNSET_SPOT_CACHE_TTL_MS = 15 * 60 * 1000;
 const SUNSET_SPOT_CACHE_KEY_PREFIX = "sunset-app-spot-cache-v2";
 const MAP_SETTLE_DELAY_MS = 900;
 const MIN_RECOMMENDATION_MOVE_METERS = 900;
+// Keep the current recommendations while at least this many remain visible in
+// the viewport — panning that still shows recs shouldn't trigger a re-fetch.
+const MIN_RECOMMENDATIONS_IN_VIEW = 2;
 // Selected spot marker sits above all others so its detail card isn't covered.
 const SELECTED_SPOT_Z_INDEX = 1000;
 
@@ -116,6 +119,12 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     null,
   );
   const lastRecommendationCenterRef = useRef(initialLocation);
+  // Latest recommendations, readable inside the debounced map-settle callback
+  // without re-binding the map event handler on every spot change.
+  const sunsetSpotsRef = useRef(sunsetSpots);
+  useEffect(() => {
+    sunsetSpotsRef.current = sunsetSpots;
+  }, [sunsetSpots]);
   const dispatch = useDispatch<AppDispatch>();
 
   // Get markers from Redux store
@@ -440,6 +449,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
             lng: event.detail.center.lng,
           }
         : null;
+      const nextBounds = event.detail.bounds ?? null;
 
       if (nextZoom) {
         setCurrentZoom(nextZoom);
@@ -467,7 +477,20 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
             )
           : MIN_RECOMMENDATION_MOVE_METERS;
 
+        // Jitter floor — ignore sub-threshold nudges regardless of coverage.
         if (movedMeters < MIN_RECOMMENDATION_MOVE_METERS) {
+          return;
+        }
+
+        // Content-aware stickiness: if the current recommendations still cover
+        // the viewport (a couple remain visible), keep them — moving the center
+        // isn't a reason to re-fetch while the user can still see recs. This is
+        // zoom-aware where a fixed distance is not.
+        if (
+          nextBounds &&
+          countSpotsInBounds(sunsetSpotsRef.current, nextBounds) >=
+            MIN_RECOMMENDATIONS_IN_VIEW
+        ) {
           return;
         }
 
@@ -1300,6 +1323,22 @@ function getSpotMarkerLabel(spot: SunsetSpot): string {
     spot.qualificationBadges[0] ?? spot.searchTags[0] ?? "Photo spot";
 
   return normalizeFilterLabel(sceneQuality || kind);
+}
+
+// How many current recommendations fall inside the map's visible bounds.
+// Longitude may wrap the antimeridian (west > east), so handle both cases.
+function countSpotsInBounds(
+  spots: SunsetSpot[],
+  bounds: { north: number; south: number; east: number; west: number },
+): number {
+  return spots.filter((spot) => {
+    if (spot.latitude > bounds.north || spot.latitude < bounds.south) {
+      return false;
+    }
+    return bounds.west <= bounds.east
+      ? spot.longitude >= bounds.west && spot.longitude <= bounds.east
+      : spot.longitude >= bounds.west || spot.longitude <= bounds.east;
+  }).length;
 }
 
 function getSunsetSpotCacheKey(center: { lat: number; lng: number }): string {
