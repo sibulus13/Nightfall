@@ -11,7 +11,7 @@ import {
 import type { SunsetSpot } from "~/types/sunsetSpot";
 import { bearingToCompass } from "~/lib/sunset/bearing";
 import CyclingLoader from "~/components/cyclingLoader";
-import { phaseCardGradient } from "~/lib/sunset/phaseColors";
+import { PHASE_COLORS, phaseCardGradient } from "~/lib/sunset/phaseColors";
 
 type Phase = SunsetSpot["bestPhase"];
 
@@ -131,6 +131,72 @@ function groupPhasesBySpot(spots: SunsetSpot[]): SpotGroup[] {
   return order.map((id) => groups.get(id)!);
 }
 
+// The coloration line reads left → right as time through the sunset sequence.
+const PHASE_GRADIENT = `linear-gradient(90deg, ${PHASES.map(
+  (phase, index) =>
+    `rgb(${PHASE_COLORS[phase.key]}) ${Math.round(
+      (index / (PHASES.length - 1)) * 100,
+    )}%`,
+).join(", ")})`;
+
+/**
+ * A linear timeline of the sunset sequence: a coloration line (the sky colour at
+ * each phase) with the phase name + approximate time under it. Doubles as a
+ * selector — tap a phase to filter the spots below to the ones best for it.
+ */
+function PhaseTimeline({
+  selectedPhase,
+  onSelectPhase,
+}: {
+  selectedPhase: Phase | null;
+  onSelectPhase: (phase: Phase) => void;
+}) {
+  return (
+    <div className="mb-3">
+      <div
+        className="h-2 w-full rounded-full"
+        style={{ backgroundImage: PHASE_GRADIENT }}
+        aria-hidden="true"
+      />
+      <div className="mt-1.5 grid grid-cols-5 gap-1">
+        {PHASES.map((phase) => {
+          const Icon = phase.icon;
+          const color = PHASE_COLORS[phase.key];
+          const isSelected = selectedPhase === phase.key;
+          return (
+            <button
+              key={phase.key}
+              type="button"
+              onClick={() => onSelectPhase(phase.key)}
+              aria-pressed={isSelected}
+              title={phase.blurb}
+              className="flex flex-col items-center gap-0.5 rounded-md border px-0.5 py-1 text-center transition-colors"
+              style={{
+                borderColor: isSelected ? `rgb(${color})` : "transparent",
+                backgroundColor: isSelected
+                  ? `rgba(${color}, 0.16)`
+                  : "transparent",
+              }}
+            >
+              <Icon
+                className="h-3.5 w-3.5"
+                style={{ color: `rgb(${color})` }}
+                aria-hidden="true"
+              />
+              <span className="text-[10px] font-semibold leading-tight">
+                {phase.label}
+              </span>
+              <span className="text-[9px] leading-tight text-muted-foreground">
+                {phase.when}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function PhaseGuide({
   spots,
   selectedSpotId,
@@ -144,6 +210,9 @@ export default function PhaseGuide({
   isLoading?: boolean;
   isRefining?: boolean;
 }) {
+  const [selectedPhase, setSelectedPhase] = useState<Phase | null>(null);
+  const togglePhase = (phase: Phase) =>
+    setSelectedPhase((current) => (current === phase ? null : phase));
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
   const toggleExpanded = (key: string) =>
     setExpandedPhases((current) => {
@@ -157,6 +226,11 @@ export default function PhaseGuide({
     });
 
   const spotGroups = groupPhasesBySpot(spots);
+  const visibleGroups = selectedPhase
+    ? spotGroups.filter((group) =>
+        group.entries.some((entry) => entry.phase.key === selectedPhase),
+      )
+    : spotGroups;
 
   return (
     <section className="nf-panel p-3">
@@ -176,6 +250,11 @@ export default function PhaseGuide({
         </p>
       </header>
 
+      <PhaseTimeline
+        selectedPhase={selectedPhase}
+        onSelectPhase={togglePhase}
+      />
+
       {isLoading && (
         <div className="mb-3 space-y-2">
           <CyclingLoader />
@@ -190,7 +269,7 @@ export default function PhaseGuide({
           isLoading ? "opacity-50" : ""
         }`}
       >
-        {spotGroups.map((group) => {
+        {visibleGroups.map((group) => {
           const Icon = group.entries[0]!.phase.icon;
           const isSelected = group.spot.id === selectedSpotId;
           const isExpanded = expandedPhases.has(group.spot.id);

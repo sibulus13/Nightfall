@@ -29,16 +29,20 @@ import {
   Binoculars,
   Camera,
   ChevronDown,
+  Eye,
   Footprints,
   Landmark,
   Loader2,
+  MapPin,
   Mountain,
   Play,
   Plus,
   Sparkles,
+  Sunset,
   Trees,
   Trash2,
   Waves,
+  type LucideIcon,
 } from "lucide-react";
 import CelestialIndicators from "./celestialIndicators";
 import PhaseGuide from "./phaseGuide";
@@ -1040,6 +1044,50 @@ function SunsetSpotLoadingState() {
   );
 }
 
+// Icon + hue for a filter option, matched by keyword, so each tag reads at a
+// glance and carries colour in both selected and unselected states.
+const FILTER_VISUALS: Array<{ match: RegExp; icon: LucideIcon; rgb: string }> = [
+  {
+    match: /water|beach|inlet|bay|reflection|marina|pier|harbou?r|lake|river|ocean|sea|coast/,
+    icon: Waves,
+    rgb: "59, 130, 246",
+  },
+  {
+    match: /vantage|elevat|mountain|hill|ridge|cliff|summit|peak|high/,
+    icon: Mountain,
+    rgb: "139, 92, 246",
+  },
+  {
+    match: /west|horizon|exposure|open|sunset|sky/,
+    icon: Sunset,
+    rgb: "249, 115, 22",
+  },
+  {
+    match: /park|garden|natural|trail|forest|green|meadow/,
+    icon: Trees,
+    rgb: "34, 197, 94",
+  },
+  {
+    match: /foreground|interest|reference|composition|scene|variety|contrast|photo/,
+    icon: Camera,
+    rgb: "236, 72, 153",
+  },
+  {
+    match: /viewpoint|lookout|overlook|view|vista/,
+    icon: Eye,
+    rgb: "20, 184, 166",
+  },
+];
+const DEFAULT_FILTER_VISUAL = { icon: MapPin, rgb: "148, 163, 184" };
+
+function getFilterVisual(label: string): { icon: LucideIcon; rgb: string } {
+  const lower = label.toLowerCase();
+  return (
+    FILTER_VISUALS.find((visual) => visual.match.test(lower)) ??
+    DEFAULT_FILTER_VISUAL
+  );
+}
+
 function SpotFilterSection({
   title,
   group,
@@ -1065,18 +1113,28 @@ function SpotFilterSection({
       <div className="flex flex-wrap gap-1.5">
         {options.map((option) => {
           const isActive = activeOptions.includes(option);
+          const { icon: OptionIcon, rgb } = getFilterVisual(option);
 
           return (
             <button
               key={option}
               type="button"
               onClick={() => onToggleFilter(group, option)}
-              className={`rounded-full border px-2 py-0.5 text-xs font-medium transition-colors ${
-                  isActive
-                    ? "border-[#a6532d] bg-[#efe1d1] text-[#3d3128] dark:bg-[#4b3326] dark:text-[#f7e4d4]"
-                    : "border-[#d9c8b6] bg-white/60 text-muted-foreground hover:text-foreground dark:border-[#3f3933] dark:bg-white/5"
-              }`}
+              aria-pressed={isActive}
+              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors"
+              style={{
+                backgroundColor: isActive
+                  ? `rgb(${rgb})`
+                  : `rgba(${rgb}, 0.1)`,
+                borderColor: isActive ? `rgb(${rgb})` : `rgba(${rgb}, 0.35)`,
+                color: isActive ? "#fff" : undefined,
+              }}
             >
+              <OptionIcon
+                className="h-3 w-3 shrink-0"
+                style={{ color: isActive ? "#fff" : `rgb(${rgb})` }}
+                aria-hidden="true"
+              />
               {option}
             </button>
           );
