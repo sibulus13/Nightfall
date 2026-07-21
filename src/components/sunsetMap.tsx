@@ -161,19 +161,38 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     () => getAvailableSpotFilters(sunsetSpots),
     [sunsetSpots],
   );
-  // A spot matches when it satisfies the pill filters AND the phase filter
-  // (if one is set). Shared by the map dimming and the "M of N" count.
-  const spotMatchesActiveFilters = useCallback(
-    (spot: SunsetSpot): boolean =>
-      (!hasActiveSpotFilters(activeSpotFilters) ||
-        doesSpotMatchFilters(spot, activeSpotFilters)) &&
-      (selectedPhase === null || spot.bestPhase === selectedPhase),
-    [activeSpotFilters, selectedPhase],
-  );
-  const matchedSpotCount = useMemo(
-    () => sunsetSpots.filter(spotMatchesActiveFilters).length,
-    [sunsetSpots, spotMatchesActiveFilters],
-  );
+  // The spots the map emphasizes (others dim). Computed over the whole set so a
+  // phase can always surface ≥1 location: within the pill-filtered pool, a phase
+  // emphasizes every spot that considers it its best phase PLUS the single
+  // highest-scoring spot for that phase — so no phase is ever empty. Pills alone
+  // emphasize their matches (each pill is derived from ≥1 spot, so never empty).
+  const emphasizedSpotIds = useMemo(() => {
+    const pool = hasActiveSpotFilters(activeSpotFilters)
+      ? sunsetSpots.filter((spot) => doesSpotMatchFilters(spot, activeSpotFilters))
+      : sunsetSpots;
+
+    if (selectedPhase === null) {
+      return new Set(pool.map((spot) => spot.id));
+    }
+    if (pool.length === 0) {
+      return new Set<string>();
+    }
+    // Guaranteed pick: the best-scoring spot for this phase in the pool.
+    const bestForPhase = pool.reduce((best, spot) =>
+      spot.phaseScores[selectedPhase] > best.phaseScores[selectedPhase]
+        ? spot
+        : best,
+    );
+    return new Set(
+      pool
+        .filter(
+          (spot) =>
+            spot.bestPhase === selectedPhase || spot.id === bestForPhase.id,
+        )
+        .map((spot) => spot.id),
+    );
+  }, [sunsetSpots, activeSpotFilters, selectedPhase]);
+  const matchedSpotCount = emphasizedSpotIds.size;
 
   // Function to get gradient background based on prediction score (matching predictions tab)
   const getScoreGradient = useCallback((score: number) => {
@@ -727,7 +746,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
               const isEmphasized =
                 selectedSpotId !== null
                   ? isSelected
-                  : spotMatchesActiveFilters(spot);
+                  : emphasizedSpotIds.has(spot.id);
               const isDimmed = !isEmphasized;
 
               return (
