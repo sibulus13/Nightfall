@@ -149,9 +149,13 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
 
   // Get markers from Redux store
   const markers = useSelector((state: RootState) => state.map.markers);
-  const { isCalculating, selectedDayIndex, predictions, dayStats } = useSelector(
-    (state: RootState) => state.map,
-  );
+  const {
+    isCalculating,
+    selectedDayIndex,
+    predictions,
+    dayStats,
+    currentLocationName,
+  } = useSelector((state: RootState) => state.map);
 
   // Use map data hook for date options and day selection
   const { dateOptions, updateSelectedDay, availableDates } = useMapData({
@@ -613,6 +617,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
         {/* One filter card — phase timeline + location/scene filters. The MAP is
             the output: matches are highlighted, non-matches dim. */}
         <SunsetSpotsPanel
+          locationName={currentLocationName}
           availableFilters={availableSpotFilters}
           activeFilters={activeSpotFilters}
           selectedPhase={selectedPhase}
@@ -906,6 +911,7 @@ function SunsetSpotMarker({
 }
 
 function SunsetSpotsPanel({
+  locationName,
   availableFilters,
   activeFilters,
   selectedPhase,
@@ -918,6 +924,7 @@ function SunsetSpotsPanel({
   onTogglePhase,
   onClearFilters,
 }: {
+  locationName: string | null;
   availableFilters: ActiveSpotFilters;
   activeFilters: ActiveSpotFilters;
   selectedPhase: Phase | null;
@@ -938,8 +945,10 @@ function SunsetSpotsPanel({
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <Camera className="h-4 w-4 text-orange-500" />
-            Best sunset spots
+            <Camera className="h-4 w-4 shrink-0 text-orange-500" />
+            <span className="truncate">
+              {locationName ? `Best sunset spots · ${locationName}` : "Best sunset spots"}
+            </span>
           </h3>
           <p className="text-xs text-muted-foreground">
             {isLoading
