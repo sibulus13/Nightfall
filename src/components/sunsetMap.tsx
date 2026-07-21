@@ -1,4 +1,11 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  type CSSProperties,
+} from "react";
 import {
   APIProvider,
   Map,
@@ -28,6 +35,7 @@ import {
   Aperture,
   Binoculars,
   Camera,
+  Check,
   ChevronDown,
   Eye,
   Footprints,
@@ -1056,27 +1064,38 @@ function SpotFilterSection({
           const isActive = activeOptions.includes(option);
           const { icon: OptionIcon, rgb } = getFilterVisual(option);
 
+          // Colours live in CSS vars so :hover/:active Tailwind classes can
+          // change the background (an inline backgroundColor would out-specify
+          // them). --pf resting fill · --pfh hover fill · --pb border/ring.
+          const pillStyle = {
+            "--pf": isActive ? `rgb(${rgb})` : `rgba(${rgb}, 0.1)`,
+            "--pfh": isActive ? `rgb(${rgb})` : `rgba(${rgb}, 0.2)`,
+            "--pb": isActive ? `rgb(${rgb})` : `rgba(${rgb}, 0.35)`,
+            "--pbh": isActive ? `rgb(${rgb})` : `rgba(${rgb}, 0.7)`,
+            "--pr": `rgb(${rgb})`,
+            color: isActive ? "#fff" : undefined,
+          } as CSSProperties;
+
           return (
             <button
               key={option}
               type="button"
               onClick={() => onToggleFilter(group, option)}
               aria-pressed={isActive}
-              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors"
-              style={{
-                backgroundColor: isActive
-                  ? `rgb(${rgb})`
-                  : `rgba(${rgb}, 0.1)`,
-                borderColor: isActive ? `rgb(${rgb})` : `rgba(${rgb}, 0.35)`,
-                color: isActive ? "#fff" : undefined,
-              }}
+              style={pillStyle}
+              className={`group inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium bg-[color:var(--pf)] border-[color:var(--pb)] transition-all duration-150 hover:bg-[color:var(--pfh)] hover:border-[color:var(--pbh)] hover:-translate-y-px hover:shadow-sm active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--pr)] focus-visible:ring-offset-1 focus-visible:ring-offset-background motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
+                isActive ? "shadow-sm" : ""
+              }`}
             >
               <OptionIcon
-                className="h-3 w-3 shrink-0"
+                className="h-3 w-3 shrink-0 transition-transform group-hover:scale-110"
                 style={{ color: isActive ? "#fff" : `rgb(${rgb})` }}
                 aria-hidden="true"
               />
               {option}
+              {isActive && (
+                <Check className="h-3 w-3 shrink-0" aria-hidden="true" />
+              )}
             </button>
           );
         })}

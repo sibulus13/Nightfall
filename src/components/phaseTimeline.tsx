@@ -1,3 +1,4 @@
+import { type CSSProperties } from "react";
 import { Sun, Sunset, Sparkles, CloudSun, Moon } from "lucide-react";
 import type { SunsetSpot } from "~/types/sunsetSpot";
 import { PHASE_COLORS } from "~/lib/sunset/phaseColors";
@@ -90,16 +91,21 @@ export function PhaseTimeline({
               onClick={() => onSelectPhase(phase.key)}
               aria-pressed={isSelected}
               title={phase.blurb}
-              className="flex flex-col items-center gap-0.5 rounded-md border px-0.5 py-1 text-center transition-colors"
-              style={{
-                borderColor: isSelected ? `rgb(${color})` : "transparent",
-                backgroundColor: isSelected
-                  ? `rgba(${color}, 0.16)`
-                  : "transparent",
-              }}
+              style={
+                {
+                  "--pc": `rgb(${color})`,
+                  "--pcf": `rgba(${color}, 0.16)`,
+                  "--pch": `rgba(${color}, 0.09)`,
+                  borderColor: isSelected ? `rgb(${color})` : "transparent",
+                  backgroundColor: isSelected ? `rgba(${color}, 0.16)` : undefined,
+                } as CSSProperties
+              }
+              className={`group flex flex-col items-center gap-0.5 rounded-md border px-0.5 py-1 text-center transition-all duration-150 hover:-translate-y-px hover:bg-[color:var(--pch)] hover:shadow-sm active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--pc)] focus-visible:ring-offset-1 focus-visible:ring-offset-background motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
+                isSelected ? "scale-105 shadow-sm" : ""
+              }`}
             >
               <Icon
-                className="h-3.5 w-3.5"
+                className="h-3.5 w-3.5 transition-transform group-hover:scale-110"
                 style={{ color: `rgb(${color})` }}
                 aria-hidden="true"
               />
