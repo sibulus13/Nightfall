@@ -72,14 +72,14 @@ const SUNSET_SPOT_CACHE_KEY_PREFIX = "sunset-app-spot-cache-v3";
 // swallow a coverage-triggered re-fetch and return stale same-cell recs.
 const SPOT_CACHE_CELL_METERS = 250;
 const METERS_PER_DEGREE_LAT = 111_320;
-const MAP_SETTLE_DELAY_MS = 900;
+const MAP_SETTLE_DELAY_MS = 400;
 // Recompute based on the recommendation CLUSTER, not raw viewport counts.
 // The "core" is the tight circle around the recs' centroid holding this
 // fraction of them (outliers trimmed)...
 const CORE_CLUSTER_FRACTION = 0.8;
 // ...and we keep the current recs while at least this fraction of that core is
 // still inside the viewport — i.e. recompute once >15% of the core has left.
-const CORE_RETENTION_THRESHOLD = 0.85;
+const CORE_RETENTION_THRESHOLD = 0.78;
 // Selected spot marker sits above all others so its detail card isn't covered.
 const SELECTED_SPOT_Z_INDEX = 1000;
 
@@ -363,7 +363,9 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       }
     };
 
-    const timeout = setTimeout(() => void loadSpots(), 650);
+    // Small coalescing debounce only — map pans are already debounced by the
+    // settle timer, so this just absorbs React's double-render on mount.
+    const timeout = setTimeout(() => void loadSpots(), 200);
 
     return () => {
       clearTimeout(timeout);
