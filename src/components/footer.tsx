@@ -5,6 +5,7 @@ const footerLinks = [
   { href: "/Contact", label: "Contact" },
   { href: "/About", label: "About" },
   { href: "/locations/vancouver-bc", label: "Guides" },
+  { href: "/developers", label: "Developers" },
   { href: "/llms.txt", label: "LLMs" },
 ];
 

@@ -28,6 +28,7 @@ const MEDIUM_REFERENCE_SCORE = 21;
 const WEAK_REFERENCE_SCORE = 10;
 const PHOTO_REFERENCE_SCORE = 8;
 const SOURCE_REQUEST_BASELINE = 1;
+const BADGE_POPULAR = "Popular";
 const BADGE_HIGH_VANTAGE = "High vantage";
 const BADGE_WESTERN_EXPOSURE = "Western exposure";
 const BADGE_WIDE_HORIZON = "Wide horizon";
@@ -615,7 +616,28 @@ function scoreViewQuality(
     score += 12;
   }
 
+  if (candidate.popularity) {
+    // Human-curated popularity (Google reviews) is a strong "confirmed good"
+    // signal — boost so well-known spots outrank generic tagged POIs.
+    score += Math.round(popularityScore(candidate) * 0.4);
+  }
+
   return Math.min(score, SCORE_MAX);
+}
+
+/** Popularity (0-100) from Google rating × review-count confidence. */
+function popularityScore(candidate: SunsetLocationCandidate): number {
+  const popularity = candidate.popularity;
+  if (!popularity) {
+    return 0;
+  }
+  // Rating 3★→0, 5★→1, weighted by review-count confidence (log, saturates ~2000).
+  const ratingFactor = Math.max(0, (popularity.rating - 3) / 2);
+  const confidence = Math.min(
+    1,
+    Math.log10(popularity.count + 1) / Math.log10(2000),
+  );
+  return Math.round(ratingFactor * confidence * SCORE_MAX);
 }
 
 function getQualificationBadges(
@@ -624,6 +646,10 @@ function getQualificationBadges(
   referenceScore: number,
 ): string[] {
   const badges: string[] = [];
+
+  if (popularityScore(candidate) >= 45) {
+    badges.push(BADGE_POPULAR);
+  }
 
   if (candidate.hasElevation || candidate.kind === "elevated-park") {
     badges.push(BADGE_HIGH_VANTAGE);

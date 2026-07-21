@@ -76,7 +76,15 @@ export default function MainPage() {
       return;
     }
 
-    dispatch({ type: "map/setCurrentLocation", payload: { lat, lng: lon } });
+    // Carry the name the user just picked so the planner's search bar reflects
+    // it immediately, instead of re-deriving it via a reverse-geocode call.
+    const name =
+      place?.name ?? place?.formatted_address?.split(",")[0] ?? undefined;
+
+    dispatch({
+      type: "map/setCurrentLocation",
+      payload: { lat, lng: lon, name },
+    });
     await predict({ lat, lon, onNavigate: toAppPage });
   }
 

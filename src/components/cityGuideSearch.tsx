@@ -1,11 +1,21 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Loader2, MapPin, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
+import { MapPin, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
+import CyclingLoader from "~/components/cyclingLoader";
 import Locator from "~/components/locator";
 import type { CityGuide, CityGuideFeedbackResponse } from "~/types/cityGuide";
 
 const CITY_GUIDE_CLIENT_CACHE_PREFIX = "nightfalls-city-guide-v1";
+
+// City-guide-flavoured phrases while the AI guide is generated.
+const GUIDE_MESSAGES = [
+  "Scouting the city",
+  "Reading the light",
+  "Picking the best spots",
+  "Timing the phases",
+  "Writing your guide",
+];
 
 export default function CityGuideSearch() {
   const [guide, setGuide] = useState<CityGuide | null>(null);
@@ -152,9 +162,8 @@ export default function CityGuideSearch() {
 
         <div className="min-h-56 rounded-md border border-[#d7c1ad] bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-white/10">
           {isLoading && (
-            <div className="flex h-full min-h-48 items-center justify-center gap-2 text-sm font-semibold text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              Scouting local sunset options
+            <div className="flex h-full min-h-48 items-center justify-center">
+              <CyclingLoader messages={GUIDE_MESSAGES} />
             </div>
           )}
 

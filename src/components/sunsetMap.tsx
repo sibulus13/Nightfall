@@ -1,4 +1,11 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  type CSSProperties,
+} from "react";
 import {
   APIProvider,
   Map,
@@ -28,22 +35,26 @@ import {
   Aperture,
   Binoculars,
   Camera,
+  Check,
   ChevronDown,
+  Eye,
   Footprints,
   Landmark,
-  Loader2,
+  MapPin,
   Mountain,
   Play,
   Plus,
   Sparkles,
+  Sunset,
   Trees,
   Trash2,
   Waves,
+  type LucideIcon,
 } from "lucide-react";
 import CelestialIndicators from "./celestialIndicators";
-import PhaseGuide from "./phaseGuide";
+import CyclingLoader from "./cyclingLoader";
+import { PhaseTimeline, type Phase } from "./phaseTimeline";
 import { bearingToCompass } from "~/lib/sunset/bearing";
-import { phaseCardGradient } from "~/lib/sunset/phaseColors";
 import type { SunsetSpot, SunsetSpotResponse } from "~/types/sunsetSpot";
 
 interface SunsetMapProps {
@@ -65,9 +76,21 @@ const mapContainerStyle = {
 const SUNSET_SPOT_RADIUS_METERS = 20000;
 const SUNSET_SPOT_LIMIT = 12;
 const SUNSET_SPOT_CACHE_TTL_MS = 15 * 60 * 1000;
-const SUNSET_SPOT_CACHE_KEY_PREFIX = "sunset-app-spot-cache-v2";
-const MAP_SETTLE_DELAY_MS = 900;
-const MIN_RECOMMENDATION_MOVE_METERS = 900;
+const SUNSET_SPOT_CACHE_KEY_PREFIX = "sunset-app-spot-cache-v3";
+// Cache bucket size. Snap the search center to a uniform grid this many metres
+// wide so a revisit/reload within one cell reuses the cached result. Kept small
+// so it only dedupes near-identical centers — a coarse bucket would otherwise
+// swallow a coverage-triggered re-fetch and return stale same-cell recs.
+const SPOT_CACHE_CELL_METERS = 250;
+const METERS_PER_DEGREE_LAT = 111_320;
+const MAP_SETTLE_DELAY_MS = 400;
+// Recompute based on the recommendation CLUSTER, not raw viewport counts.
+// The "core" is the tight circle around the recs' centroid holding this
+// fraction of them (outliers trimmed)...
+const CORE_CLUSTER_FRACTION = 0.8;
+// ...and we keep the current recs while at least this fraction of that core is
+// still inside the viewport — i.e. recompute once >15% of the core has left.
+const CORE_RETENTION_THRESHOLD = 0.78;
 // Selected spot marker sits above all others so its detail card isn't covered.
 const SELECTED_SPOT_Z_INDEX = 1000;
 
@@ -103,8 +126,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
   const [isLoadingSpots, setIsLoadingSpots] = useState(false);
   const [isRefiningSpots, setIsRefiningSpots] = useState(false);
-  const [spotSource, setSpotSource] =
-    useState<SunsetSpotResponse["source"] | null>(null);
   const [spotError, setSpotError] = useState<string | null>(null);
   const [activeSpotFilters, setActiveSpotFilters] =
     useState<ActiveSpotFilters>({
@@ -112,10 +133,18 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       locationTypes: [],
       features: [],
     });
+  // Phase filter (from the timeline). Kept by key so the map can match on
+  // spot.bestPhase without the label round-trip the pill filters use.
+  const [selectedPhase, setSelectedPhase] = useState<Phase | null>(null);
   const mapSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
-  const lastRecommendationCenterRef = useRef(initialLocation);
+  // Latest recommendations, readable inside the debounced map-settle callback
+  // without re-binding the map event handler on every spot change.
+  const sunsetSpotsRef = useRef(sunsetSpots);
+  useEffect(() => {
+    sunsetSpotsRef.current = sunsetSpots;
+  }, [sunsetSpots]);
   const dispatch = useDispatch<AppDispatch>();
 
   // Get markers from Redux store
@@ -132,15 +161,19 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     () => getAvailableSpotFilters(sunsetSpots),
     [sunsetSpots],
   );
-  const filteredSunsetSpots = useMemo(() => {
-    if (!hasActiveSpotFilters(activeSpotFilters)) {
-      return sunsetSpots;
-    }
-
-    return sunsetSpots.filter((spot) =>
-      doesSpotMatchFilters(spot, activeSpotFilters),
-    );
-  }, [activeSpotFilters, sunsetSpots]);
+  // A spot matches when it satisfies the pill filters AND the phase filter
+  // (if one is set). Shared by the map dimming and the "M of N" count.
+  const spotMatchesActiveFilters = useCallback(
+    (spot: SunsetSpot): boolean =>
+      (!hasActiveSpotFilters(activeSpotFilters) ||
+        doesSpotMatchFilters(spot, activeSpotFilters)) &&
+      (selectedPhase === null || spot.bestPhase === selectedPhase),
+    [activeSpotFilters, selectedPhase],
+  );
+  const matchedSpotCount = useMemo(
+    () => sunsetSpots.filter(spotMatchesActiveFilters).length,
+    [sunsetSpots, spotMatchesActiveFilters],
+  );
 
   // Function to get gradient background based on prediction score (matching predictions tab)
   const getScoreGradient = useCallback((score: number) => {
@@ -228,7 +261,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     if (initialLocation) {
       setCenter(initialLocation);
       setQueryCenter(initialLocation);
-      lastRecommendationCenterRef.current = initialLocation;
     }
   }, [initialLocation]);
 
@@ -236,7 +268,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     const candidates = data.candidates.map(normalizeSunsetSpot);
 
     setSunsetSpots(candidates);
-    setSpotSource(data.source);
     setActiveSpotFilters((currentFilters) =>
       pruneActiveSpotFilters(currentFilters, candidates),
     );
@@ -255,6 +286,20 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   useEffect(() => {
     const center = queryCenter;
     if (!center) {
+      return;
+    }
+
+    const cacheKey = getSunsetSpotCacheKey(center);
+
+    // Instant cache hit — apply synchronously with no debounce and no loading
+    // flash, so revisiting a nearby area (or toggling back to the map tab)
+    // reuses the same recommendations immediately instead of re-fetching.
+    const cachedResponse = getCachedSunsetSpotResponse(cacheKey);
+    if (cachedResponse) {
+      applySunsetSpotResponse(cachedResponse);
+      setIsLoadingSpots(false);
+      setIsRefiningSpots(false);
+      setSpotError(null);
       return;
     }
 
@@ -287,17 +332,14 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       setIsLoadingSpots(true);
       setSpotError(null);
 
-      const cacheKey = getSunsetSpotCacheKey(center);
-      const cachedResponse = getCachedSunsetSpotResponse(cacheKey);
-      if (cachedResponse) {
-        applySunsetSpotResponse(cachedResponse);
-        setIsLoadingSpots(false);
-        setIsRefiningSpots(false);
-        return;
-      }
+      // New location → drop the previous location's spots so the card + map
+      // pins show a loading state instead of stale recommendations that no
+      // longer match where we're searching.
+      setSunsetSpots([]);
+      setSelectedSpotId(null);
+      setIsRefiningSpots(false);
 
-      // Phase 1 — fast keyword-ranked paint (no terrain). Previous results stay
-      // on screen until this resolves, so a search never flashes empty.
+      // Phase 1 — fast keyword-ranked paint (no terrain).
       let fastSucceeded = false;
       try {
         const fast = await fetchSpots(false);
@@ -322,7 +364,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
         if (!fastSucceeded) {
           console.error("Error loading sunset spots:", error);
           setSunsetSpots([]);
-          setSpotSource(null);
           setSelectedSpotId(null);
           setSpotError("Could not load nearby sunset spots.");
         }
@@ -335,7 +376,9 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       }
     };
 
-    const timeout = setTimeout(() => void loadSpots(), 650);
+    // Small coalescing debounce only — map pans are already debounced by the
+    // settle timer, so this just absorbs React's double-render on mount.
+    const timeout = setTimeout(() => void loadSpots(), 200);
 
     return () => {
       clearTimeout(timeout);
@@ -349,20 +392,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     lng1: number,
     lat2: number,
     lng2: number,
-  ) => {
-    const R = 6371e3; // Earth's radius in meters
-    const φ1 = (lat1 * Math.PI) / 180; // φ, λ in radians
-    const φ2 = (lat2 * Math.PI) / 180;
-    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-    const Δλ = ((lng2 - lng1) * Math.PI) / 180;
-
-    const a =
-      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c; // in metres
-  };
+  ) => haversineMeters(lat1, lng1, lat2, lng2);
 
   // Handle map clicks to add/remove markers
   const handleMapClick = useCallback(
@@ -428,6 +458,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
             lng: event.detail.center.lng,
           }
         : null;
+      const nextBounds = event.detail.bounds ?? null;
 
       if (nextZoom) {
         setCurrentZoom(nextZoom);
@@ -445,21 +476,24 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       }
 
       mapSettleTimeoutRef.current = setTimeout(() => {
-        const lastRecommendationCenter = lastRecommendationCenterRef.current;
-        const movedMeters = lastRecommendationCenter
-          ? getDistance(
-              lastRecommendationCenter.lat,
-              lastRecommendationCenter.lng,
-              nextCenter.lat,
-              nextCenter.lng,
-            )
-          : MIN_RECOMMENDATION_MOVE_METERS;
-
-        if (movedMeters < MIN_RECOMMENDATION_MOVE_METERS) {
-          return;
+        // Recompute based on the recommendation CLUSTER, not the raw viewport
+        // count. Establish the core circle that holds CORE_CLUSTER_FRACTION of
+        // the recs (outliers trimmed), then keep the current recs while at least
+        // CORE_RETENTION_THRESHOLD of that core is still inside the viewport.
+        // This accounts for how the recs actually cluster — panning off the
+        // dense area re-fetches even if a stray outlier lingers in view.
+        const core = nextBounds
+          ? computeCoreCluster(sunsetSpotsRef.current, CORE_CLUSTER_FRACTION)
+          : null;
+        if (core && nextBounds) {
+          const retainedInView = core.spots.filter((spot) =>
+            pointInBounds(spot.latitude, spot.longitude, nextBounds),
+          ).length;
+          if (retainedInView / core.count >= CORE_RETENTION_THRESHOLD) {
+            return;
+          }
         }
 
-        lastRecommendationCenterRef.current = nextCenter;
         setQueryCenter(nextCenter);
         dispatch(setCurrentLocation(nextCenter));
 
@@ -557,37 +591,33 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
         {/* Aggregate banner — once ≥2 markers have predictions */}
         {dayStats && <DayStatsBanner stats={dayStats} />}
 
-        {/* Phase recommendations (output) */}
-        <PhaseGuide
-          spots={sunsetSpots}
-          selectedSpotId={selectedSpotId}
-          onSelectSpot={toggleSelectedSpot}
-          isLoading={isLoadingSpots}
-          isRefining={isRefiningSpots}
-        />
-
-        {/* Browse all nearby spots + filters */}
+        {/* One filter card — phase timeline + location/scene filters. The MAP is
+            the output: matches are highlighted, non-matches dim. */}
         <SunsetSpotsPanel
-          spots={filteredSunsetSpots}
           availableFilters={availableSpotFilters}
           activeFilters={activeSpotFilters}
-          selectedSpotId={selectedSpotId}
+          selectedPhase={selectedPhase}
+          matchCount={matchedSpotCount}
+          totalCount={sunsetSpots.length}
           isLoading={isLoadingSpots}
-          source={spotSource}
+          isRefining={isRefiningSpots}
           error={spotError}
           onToggleFilter={(group, value) => {
             setActiveSpotFilters((currentFilters) =>
               toggleSpotFilter(currentFilters, group, value),
             );
           }}
-          onClearFilters={() =>
+          onTogglePhase={(phase) =>
+            setSelectedPhase((current) => (current === phase ? null : phase))
+          }
+          onClearFilters={() => {
             setActiveSpotFilters({
               phases: [],
               locationTypes: [],
               features: [],
-            })
-          }
-          onSelectSpot={toggleSelectedSpot}
+            });
+            setSelectedPhase(null);
+          }}
         />
       </div>
 
@@ -601,7 +631,10 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
             zoom={currentZoom}
             minZoom={minZoom}
             maxZoom={maxZoom}
-            gestureHandling={"greedy"}
+            // "cooperative": page scroll passes through the map; the map only
+            // zooms on ctrl/⌘ + scroll (or two-finger), so it can't trap the
+            // page scroll. Dragging still pans.
+            gestureHandling={"cooperative"}
             disableDefaultUI={false}
             scrollwheel={true}
             onBoundsChanged={onBoundsChanged}
@@ -685,21 +718,37 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
               );
             })}
 
-            {filteredSunsetSpots.map((spot) => {
+            {sunsetSpots.map((spot) => {
               const isSelected = spot.id === selectedSpotId;
+              // With a spot selected, spotlight just that one; otherwise
+              // spotlight the filter + phase matches. Non-emphasized markers dim
+              // (stay on the map for context) rather than disappear, so you can
+              // tell which spots the filter/selection picked out.
+              const isEmphasized =
+                selectedSpotId !== null
+                  ? isSelected
+                  : spotMatchesActiveFilters(spot);
+              const isDimmed = !isEmphasized;
 
               return (
                 <AdvancedMarker
                   key={spot.id}
                   position={{ lat: spot.latitude, lng: spot.longitude }}
                   onClick={() => toggleSelectedSpot(spot.id)}
-                  // Raise the selected marker above all others so its open
-                  // detail card isn't covered by neighbouring markers.
-                  zIndex={isSelected ? SELECTED_SPOT_Z_INDEX : undefined}
+                  // Selected marker on top (its popup mustn't be covered);
+                  // dimmed markers sink below the emphasized ones.
+                  zIndex={
+                    isSelected
+                      ? SELECTED_SPOT_Z_INDEX
+                      : isDimmed
+                        ? 1
+                        : 100
+                  }
                 >
                   <SunsetSpotMarker
                     spot={spot}
                     isSelected={isSelected}
+                    isDimmed={isDimmed}
                     canAddMarker={markers.length < 5}
                     onAddSpot={addSpotToMarkers}
                     // Marker in the upper half of the map → open the popup
@@ -729,12 +778,14 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
 function SunsetSpotMarker({
   spot,
   isSelected,
+  isDimmed,
   canAddMarker,
   onAddSpot,
   openDownward,
 }: {
   spot: SunsetSpot;
   isSelected: boolean;
+  isDimmed: boolean;
   canAddMarker: boolean;
   onAddSpot: (spot: SunsetSpot) => void;
   openDownward: boolean;
@@ -744,7 +795,11 @@ function SunsetSpotMarker({
   const visibleBadges = spot.qualificationBadges.slice(0, 2);
 
   return (
-    <div className="relative flex flex-col items-center">
+    <div
+      className={`relative flex flex-col items-center transition-opacity duration-300 ${
+        isDimmed ? "opacity-30 hover:opacity-100" : "opacity-100"
+      }`}
+    >
       <div
         className={`flex h-10 w-10 items-center justify-center rounded-full border-2 bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600 text-white shadow-lg transition-transform ${
           isSelected
@@ -832,29 +887,32 @@ function SunsetSpotMarker({
 }
 
 function SunsetSpotsPanel({
-  spots,
   availableFilters,
   activeFilters,
-  selectedSpotId,
+  selectedPhase,
+  matchCount,
+  totalCount,
   isLoading,
-  source,
+  isRefining,
   error,
   onToggleFilter,
+  onTogglePhase,
   onClearFilters,
-  onSelectSpot,
 }: {
-  spots: SunsetSpot[];
   availableFilters: ActiveSpotFilters;
   activeFilters: ActiveSpotFilters;
-  selectedSpotId: string | null;
+  selectedPhase: Phase | null;
+  matchCount: number;
+  totalCount: number;
   isLoading: boolean;
-  source: SunsetSpotResponse["source"] | null;
+  isRefining: boolean;
   error: string | null;
   onToggleFilter: (group: SpotFilterGroup, value: string) => void;
+  onTogglePhase: (phase: Phase) => void;
   onClearFilters: () => void;
-  onSelectSpot: (spotId: string) => void;
 }) {
-  const hasFilters = hasActiveSpotFilters(activeFilters);
+  const hasFilters =
+    hasActiveSpotFilters(activeFilters) || selectedPhase !== null;
 
   return (
     <aside className="nf-panel p-3">
@@ -862,17 +920,43 @@ function SunsetSpotsPanel({
         <div>
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             <Camera className="h-4 w-4 text-orange-500" />
-            Recommended spots
+            Best sunset spots
           </h3>
           <p className="text-xs text-muted-foreground">
-            {source === "live-overpass"
-              ? "Filtered from nearby map signals"
-              : source === "mixed"
-                ? "Map signals with local recommendations"
-              : "Local recommendations"}
+            {isLoading
+              ? "Scanning nearby…"
+              : isRefining
+                ? "Refining with terrain…"
+                : hasFilters
+                  ? `${matchCount} of ${totalCount} highlighted on the map`
+                  : `${totalCount} nearby · tap a marker to open it`}
           </p>
         </div>
-        {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={onClearFilters}
+            className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {isLoading && (
+        <div className="mb-3">
+          <CyclingLoader />
+        </div>
+      )}
+
+      <div className="mb-3">
+        <div className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+          Sunset phase
+        </div>
+        <PhaseTimeline
+          selectedPhase={selectedPhase}
+          onSelectPhase={onTogglePhase}
+        />
       </div>
 
       {(availableFilters.locationTypes.length > 0 ||
@@ -892,127 +976,64 @@ function SunsetSpotsPanel({
             activeOptions={activeFilters.features}
             onToggleFilter={onToggleFilter}
           />
-          {hasFilters && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={onClearFilters}
-                className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-              >
-                Clear filters
-              </button>
-            </div>
-          )}
         </div>
       )}
 
       {error && (
-        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
           {error}
         </div>
       )}
 
-      {isLoading && spots.length === 0 && <SunsetSpotLoadingState />}
-
-      <div className="mb-3 max-h-44 space-y-2 overflow-y-auto pr-1">
-        {spots.length === 0 && !isLoading ? (
-          <div className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
-            No recommendations match those filters.
-          </div>
-        ) : (
-          spots.map((spot) => (
-            <button
-              key={spot.id}
-              type="button"
-              onClick={() => onSelectSpot(spot.id)}
-              className={`w-full rounded-md border p-2 text-left transition-colors ${
-                spot.id === selectedSpotId
-                  ? "border-[#a6532d] bg-[#fff4e8] text-[#2b241f] dark:bg-[#33241d] dark:text-[#f7e4d4]"
-                  : "border-[#d9c8b6] bg-white/60 hover:bg-[#f5eee5] dark:border-[#3f3933] dark:bg-white/5 dark:hover:bg-white/10"
-              }`}
-              // Same standardized wash as the phase cards, keyed on best phase.
-              style={{
-                backgroundImage: phaseCardGradient(
-                  spot.bestPhase,
-                  spot.phaseScores[spot.bestPhase],
-                ),
-              }}
-              title={`Show ${spot.name} on the map`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <span className="flex min-w-0 items-start gap-2">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600 text-white">
-                    {(() => {
-                      const SpotIcon = getSpotMarkerIcon(spot);
-                      return <SpotIcon className="h-3.5 w-3.5" aria-hidden="true" />;
-                    })()}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">
-                      {spot.name}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {getSpotMarkerLabel(spot)} · {getPhaseLabel(spot.bestPhase)}
-                    </span>
-                  </span>
-                </span>
-                <span
-                  className="shrink-0 rounded-full border border-[#e3c5b4] bg-white/70 px-2 py-0.5 text-xs font-semibold text-[#6f3a28] dark:border-white/10 dark:bg-white/10 dark:text-[#f0c2b0]"
-                  aria-hidden="true"
-                >
-                  map
-                </span>
-              </div>
-            </button>
-          ))
-        )}
-      </div>
-
-      <div className="rounded-md border border-dashed border-[#dfc7b6] bg-white/45 p-2 text-xs text-muted-foreground dark:border-white/10 dark:bg-white/5">
-        Select a spot to open its map popup. Add promising places from the popup
-        and run predictions when you are ready.
-      </div>
+      <p className="mt-3 rounded-md border border-dashed border-[#dfc7b6] bg-white/45 p-2 text-xs text-muted-foreground dark:border-white/10 dark:bg-white/5">
+        Matches are highlighted on the map — tap a marker to open it, then add
+        promising places to run predictions.
+      </p>
     </aside>
   );
 }
 
-function SunsetSpotLoadingState() {
-  const loadingSteps = [
-    "Reading golden-hour timing",
-    "Checking horizon and water cues",
-    "Comparing view angles",
-    "Looking for reflection potential",
-    "Ranking nearby recommendations",
-  ];
-  const [stepIndex, setStepIndex] = useState(0);
+// Icon + hue for a filter option, matched by keyword, so each tag reads at a
+// glance and carries colour in both selected and unselected states.
+const FILTER_VISUALS: Array<{ match: RegExp; icon: LucideIcon; rgb: string }> = [
+  {
+    match: /water|beach|inlet|bay|reflection|marina|pier|harbou?r|lake|river|ocean|sea|coast/,
+    icon: Waves,
+    rgb: "59, 130, 246",
+  },
+  {
+    match: /vantage|elevat|mountain|hill|ridge|cliff|summit|peak|high/,
+    icon: Mountain,
+    rgb: "139, 92, 246",
+  },
+  {
+    match: /west|horizon|exposure|open|sunset|sky/,
+    icon: Sunset,
+    rgb: "249, 115, 22",
+  },
+  {
+    match: /park|garden|natural|trail|forest|green|meadow/,
+    icon: Trees,
+    rgb: "34, 197, 94",
+  },
+  {
+    match: /foreground|interest|reference|composition|scene|variety|contrast|photo/,
+    icon: Camera,
+    rgb: "236, 72, 153",
+  },
+  {
+    match: /viewpoint|lookout|overlook|view|vista/,
+    icon: Eye,
+    rgb: "20, 184, 166",
+  },
+];
+const DEFAULT_FILTER_VISUAL = { icon: MapPin, rgb: "148, 163, 184" };
 
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setStepIndex((currentStepIndex) =>
-        (currentStepIndex + 1) % loadingSteps.length,
-      );
-    }, 1200);
-
-    return () => window.clearInterval(interval);
-  }, [loadingSteps.length]);
-
+function getFilterVisual(label: string): { icon: LucideIcon; rgb: string } {
+  const lower = label.toLowerCase();
   return (
-    <div className="mb-3 rounded-md border border-orange-200 bg-orange-50 p-3">
-      <div className="mb-2 flex items-center gap-2 text-xs font-medium text-orange-950">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        {loadingSteps[stepIndex]}
-      </div>
-      <div className="grid grid-cols-5 gap-1">
-        {loadingSteps.map((step, index) => (
-          <div
-            key={step}
-            className={`h-1 rounded-full ${
-              index <= stepIndex ? "bg-orange-400" : "bg-orange-100"
-            }`}
-          />
-        ))}
-      </div>
-    </div>
+    FILTER_VISUALS.find((visual) => visual.match.test(lower)) ??
+    DEFAULT_FILTER_VISUAL
   );
 }
 
@@ -1041,19 +1062,40 @@ function SpotFilterSection({
       <div className="flex flex-wrap gap-1.5">
         {options.map((option) => {
           const isActive = activeOptions.includes(option);
+          const { icon: OptionIcon, rgb } = getFilterVisual(option);
+
+          // Colours live in CSS vars so :hover/:active Tailwind classes can
+          // change the background (an inline backgroundColor would out-specify
+          // them). --pf resting fill · --pfh hover fill · --pb border/ring.
+          const pillStyle = {
+            "--pf": isActive ? `rgb(${rgb})` : `rgba(${rgb}, 0.1)`,
+            "--pfh": isActive ? `rgb(${rgb})` : `rgba(${rgb}, 0.2)`,
+            "--pb": isActive ? `rgb(${rgb})` : `rgba(${rgb}, 0.35)`,
+            "--pbh": isActive ? `rgb(${rgb})` : `rgba(${rgb}, 0.7)`,
+            "--pr": `rgb(${rgb})`,
+            color: isActive ? "#fff" : undefined,
+          } as CSSProperties;
 
           return (
             <button
               key={option}
               type="button"
               onClick={() => onToggleFilter(group, option)}
-              className={`rounded-full border px-2 py-0.5 text-xs font-medium transition-colors ${
-                  isActive
-                    ? "border-[#a6532d] bg-[#efe1d1] text-[#3d3128] dark:bg-[#4b3326] dark:text-[#f7e4d4]"
-                    : "border-[#d9c8b6] bg-white/60 text-muted-foreground hover:text-foreground dark:border-[#3f3933] dark:bg-white/5"
+              aria-pressed={isActive}
+              style={pillStyle}
+              className={`group inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium bg-[color:var(--pf)] border-[color:var(--pb)] transition-all duration-150 hover:bg-[color:var(--pfh)] hover:border-[color:var(--pbh)] hover:-translate-y-px hover:shadow-sm active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--pr)] focus-visible:ring-offset-1 focus-visible:ring-offset-background motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
+                isActive ? "shadow-sm" : ""
               }`}
             >
+              <OptionIcon
+                className="h-3 w-3 shrink-0 transition-transform group-hover:scale-110"
+                style={{ color: isActive ? "#fff" : `rgb(${rgb})` }}
+                aria-hidden="true"
+              />
               {option}
+              {isActive && (
+                <Check className="h-3 w-3 shrink-0" aria-hidden="true" />
+              )}
             </button>
           );
         })}
@@ -1290,11 +1332,97 @@ function getSpotMarkerLabel(spot: SunsetSpot): string {
   return normalizeFilterLabel(sceneQuality || kind);
 }
 
+function haversineMeters(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 6371e3; // Earth's radius in metres
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Is a point inside the map's visible bounds? Longitude may wrap the
+// antimeridian (west > east), so handle both cases.
+function pointInBounds(
+  latitude: number,
+  longitude: number,
+  bounds: { north: number; south: number; east: number; west: number },
+): boolean {
+  if (latitude > bounds.north || latitude < bounds.south) {
+    return false;
+  }
+  return bounds.west <= bounds.east
+    ? longitude >= bounds.west && longitude <= bounds.east
+    : longitude >= bounds.west || longitude <= bounds.east;
+}
+
+interface CoreCluster {
+  spots: SunsetSpot[];
+  count: number;
+  centerLat: number;
+  centerLng: number;
+  radiusMeters: number;
+}
+
+// The recommendation "core": the tightest circle around the recs' centroid that
+// still holds `fraction` of them. Trimming the scattered outliers means the
+// re-fetch trigger tracks where the recs actually concentrate, not a spread
+// inflated by one far-flung spot. Returns the core subset + its circle.
+function computeCoreCluster(
+  spots: SunsetSpot[],
+  fraction: number,
+): CoreCluster | null {
+  if (spots.length === 0) {
+    return null;
+  }
+  const centerLat =
+    spots.reduce((sum, spot) => sum + spot.latitude, 0) / spots.length;
+  const centerLng =
+    spots.reduce((sum, spot) => sum + spot.longitude, 0) / spots.length;
+  const byDistance = spots
+    .map((spot) => ({
+      spot,
+      distance: haversineMeters(
+        centerLat,
+        centerLng,
+        spot.latitude,
+        spot.longitude,
+      ),
+    }))
+    .sort((a, b) => a.distance - b.distance);
+  const coreCount = Math.max(1, Math.ceil(spots.length * fraction));
+  const core = byDistance.slice(0, coreCount);
+  return {
+    spots: core.map((entry) => entry.spot),
+    count: core.length,
+    centerLat,
+    centerLng,
+    radiusMeters: core[core.length - 1]?.distance ?? 0,
+  };
+}
+
 function getSunsetSpotCacheKey(center: { lat: number; lng: number }): string {
+  // Snap to a uniform ~1km grid measured in metres (not raw degrees, whose
+  // cells distort toward the poles). Longitude metres-per-degree shrink with
+  // latitude, so scale the longitude step by cos(lat); clamp near the poles to
+  // avoid divide-by-zero.
+  const latStep = SPOT_CACHE_CELL_METERS / METERS_PER_DEGREE_LAT;
+  const cosLat = Math.max(Math.cos((center.lat * Math.PI) / 180), 0.01);
+  const lngStep = SPOT_CACHE_CELL_METERS / (METERS_PER_DEGREE_LAT * cosLat);
+  const snappedLat = Math.round(center.lat / latStep) * latStep;
+  const snappedLng = Math.round(center.lng / lngStep) * lngStep;
   return [
     SUNSET_SPOT_CACHE_KEY_PREFIX,
-    center.lat.toFixed(3),
-    center.lng.toFixed(3),
+    snappedLat.toFixed(4),
+    snappedLng.toFixed(4),
     SUNSET_SPOT_RADIUS_METERS,
     SUNSET_SPOT_LIMIT,
   ].join(":");

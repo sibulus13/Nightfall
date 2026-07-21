@@ -15,6 +15,7 @@ import {
   clearRateLimit,
   hydrateFromLocalStorage,
   setCurrentLocation as setMapCurrentLocation,
+  setCurrentLocationName as setMapCurrentLocationName,
 } from "~/lib/map/mapSlice";
 import { useDispatch } from "react-redux";
 import { areCoordinatesEqual } from "~/lib/utils";
@@ -146,6 +147,14 @@ export default function AppPage() {
   const mapLocationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasAppliedUrlLocationRef = useRef(false);
 
+  // Persist the displayed location name so a reload restores it from storage
+  // instead of depending on a fresh reverse-geocode (which can fail).
+  useEffect(() => {
+    if (locationName) {
+      dispatch(setMapCurrentLocationName(locationName));
+    }
+  }, [locationName, dispatch]);
+
   // Memoize the initial location to prevent unnecessary re-renders
   const memoizedInitialLocation = useMemo(() => {
     return currentLocation.lat !== 0 && currentLocation.lng !== 0
@@ -168,6 +177,7 @@ export default function AppPage() {
     isRateLimited,
     rateLimitMessage,
     currentLocation: mapLocation,
+    currentLocationName: mapLocationName,
     availableDates,
   } = useSelector(
     (state: {
@@ -175,6 +185,7 @@ export default function AppPage() {
         isRateLimited: boolean;
         rateLimitMessage: string;
         currentLocation: { lat: number; lng: number } | null;
+        currentLocationName: string | null;
         availableDates: string[];
       };
     }) => state.map,
@@ -315,10 +326,16 @@ export default function AppPage() {
         predict({ lat: mapLocation.lat, lon: mapLocation.lng }).catch(
           console.error,
         );
-        // Get location name
-        void getLocationName(mapLocation.lat, mapLocation.lng).then((name) => {
-          if (name) setLocationName(name);
-        });
+        // Prefer the name carried from the user's selection so the search bar
+        // fills in immediately; only reverse-geocode as a fallback (that call
+        // is also referrer-restricted and can fail on non-prod origins).
+        if (mapLocationName) {
+          setLocationName(mapLocationName);
+        } else {
+          void getLocationName(mapLocation.lat, mapLocation.lng).then((name) => {
+            if (name) setLocationName(name);
+          });
+        }
       } else {
         // Fall back to localStorage
         const lat = Number(localStorage.getItem("lat"));
@@ -341,7 +358,14 @@ export default function AppPage() {
 
     // Mark as initialized after the first run
     setIsInitialized(true);
-  }, [currentLocation.lat, currentLocation.lng, dispatch, mapLocation, predict]);
+  }, [
+    currentLocation.lat,
+    currentLocation.lng,
+    dispatch,
+    mapLocation,
+    mapLocationName,
+    predict,
+  ]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

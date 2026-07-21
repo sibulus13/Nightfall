@@ -5,6 +5,7 @@ import { type Metadata } from "next";
 import { Analytics } from "@vercel/analytics/react";
 import Navbar from "~/components/navbar";
 import Footer from "~/components/footer";
+import MikoWidget from "~/components/nightfalls/mikoWidget";
 import { ThemeProvider } from "~/components/themeProvider";
 import StoreProvider from "./StoreProvider";
 import { env } from "~/env";
@@ -93,6 +94,7 @@ export default function RootLayout({
             <Navbar />
             {children}
             <Footer />
+            <MikoWidget />
           </StoreProvider>
         </ThemeProvider>
       </body>
