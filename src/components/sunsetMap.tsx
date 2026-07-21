@@ -713,21 +713,38 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
               );
             })}
 
-            {filteredSunsetSpots.map((spot) => {
+            {sunsetSpots.map((spot) => {
               const isSelected = spot.id === selectedSpotId;
+              const matchesActiveFilters =
+                !hasActiveSpotFilters(activeSpotFilters) ||
+                doesSpotMatchFilters(spot, activeSpotFilters);
+              // With a spot selected, spotlight just that one; otherwise
+              // spotlight the filter matches. Non-emphasized markers dim (stay
+              // on the map for context) rather than disappear, so you can tell
+              // which spots the filter/selection picked out.
+              const isEmphasized =
+                selectedSpotId !== null ? isSelected : matchesActiveFilters;
+              const isDimmed = !isEmphasized;
 
               return (
                 <AdvancedMarker
                   key={spot.id}
                   position={{ lat: spot.latitude, lng: spot.longitude }}
                   onClick={() => toggleSelectedSpot(spot.id)}
-                  // Raise the selected marker above all others so its open
-                  // detail card isn't covered by neighbouring markers.
-                  zIndex={isSelected ? SELECTED_SPOT_Z_INDEX : undefined}
+                  // Selected marker on top (its popup mustn't be covered);
+                  // dimmed markers sink below the emphasized ones.
+                  zIndex={
+                    isSelected
+                      ? SELECTED_SPOT_Z_INDEX
+                      : isDimmed
+                        ? 1
+                        : 100
+                  }
                 >
                   <SunsetSpotMarker
                     spot={spot}
                     isSelected={isSelected}
+                    isDimmed={isDimmed}
                     canAddMarker={markers.length < 5}
                     onAddSpot={addSpotToMarkers}
                     // Marker in the upper half of the map → open the popup
@@ -757,12 +774,14 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
 function SunsetSpotMarker({
   spot,
   isSelected,
+  isDimmed,
   canAddMarker,
   onAddSpot,
   openDownward,
 }: {
   spot: SunsetSpot;
   isSelected: boolean;
+  isDimmed: boolean;
   canAddMarker: boolean;
   onAddSpot: (spot: SunsetSpot) => void;
   openDownward: boolean;
@@ -772,7 +791,11 @@ function SunsetSpotMarker({
   const visibleBadges = spot.qualificationBadges.slice(0, 2);
 
   return (
-    <div className="relative flex flex-col items-center">
+    <div
+      className={`relative flex flex-col items-center transition-opacity duration-300 ${
+        isDimmed ? "opacity-30 hover:opacity-100" : "opacity-100"
+      }`}
+    >
       <div
         className={`flex h-10 w-10 items-center justify-center rounded-full border-2 bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600 text-white shadow-lg transition-transform ${
           isSelected
