@@ -78,8 +78,8 @@ const MAP_SETTLE_DELAY_MS = 900;
 // fraction of them (outliers trimmed)...
 const CORE_CLUSTER_FRACTION = 0.8;
 // ...and we keep the current recs while at least this fraction of that core is
-// still inside the viewport — i.e. recompute once >30% of the core has left.
-const CORE_RETENTION_THRESHOLD = 0.7;
+// still inside the viewport — i.e. recompute once >15% of the core has left.
+const CORE_RETENTION_THRESHOLD = 0.85;
 // Selected spot marker sits above all others so its detail card isn't covered.
 const SELECTED_SPOT_Z_INDEX = 1000;
 
