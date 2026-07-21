@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { SunsetSpot } from "~/types/sunsetSpot";
 import { bearingToCompass } from "~/lib/sunset/bearing";
+import CyclingLoader from "~/components/cyclingLoader";
 import { phaseCardGradient } from "~/lib/sunset/phaseColors";
 
 type Phase = SunsetSpot["bestPhase"];
@@ -177,10 +178,7 @@ export default function PhaseGuide({
 
       {isLoading && (
         <div className="mb-3 space-y-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Finding the best sunset spots nearby…
-          </div>
+          <CyclingLoader />
           <div className="nf-sunset-band animate-pulse" aria-hidden="true" />
         </div>
       )}
