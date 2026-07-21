@@ -389,12 +389,22 @@ export const mapSlice = createSlice({
       const { lat, lng, name } = action.payload;
       const coordinates = { lat, lng };
       state.currentLocation = coordinates;
-      state.currentLocationName = name ?? null;
 
       // Save to localStorage
       saveToLocalStorage("sunset-app-last-location", coordinates);
-      saveToLocalStorage(LOCATION_NAME_STORAGE_KEY, name ?? null);
       saveBrowserLocationPreference(coordinates);
+
+      // Only touch the name when one is provided. Nameless dispatches (e.g. map
+      // pans) must NOT wipe a previously-resolved name to null, or a reload
+      // would lose the location label and depend on a fresh reverse-geocode.
+      if (name !== undefined) {
+        state.currentLocationName = name;
+        saveToLocalStorage(LOCATION_NAME_STORAGE_KEY, name);
+      }
+    },
+    setCurrentLocationName: (state, action: { payload: string }) => {
+      state.currentLocationName = action.payload;
+      saveToLocalStorage(LOCATION_NAME_STORAGE_KEY, action.payload);
     },
     resetMap: (state) => {
       state.markers = [];
@@ -557,6 +567,7 @@ export const {
   clearAllMarkers,
   setSelectedDayIndex,
   setCurrentLocation,
+  setCurrentLocationName,
   resetMap,
   clearRateLimit,
   clearCache,

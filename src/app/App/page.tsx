@@ -15,6 +15,7 @@ import {
   clearRateLimit,
   hydrateFromLocalStorage,
   setCurrentLocation as setMapCurrentLocation,
+  setCurrentLocationName as setMapCurrentLocationName,
 } from "~/lib/map/mapSlice";
 import { useDispatch } from "react-redux";
 import { areCoordinatesEqual } from "~/lib/utils";
@@ -145,6 +146,14 @@ export default function AppPage() {
   const [locationName, setLocationName] = useState<string>("");
   const mapLocationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasAppliedUrlLocationRef = useRef(false);
+
+  // Persist the displayed location name so a reload restores it from storage
+  // instead of depending on a fresh reverse-geocode (which can fail).
+  useEffect(() => {
+    if (locationName) {
+      dispatch(setMapCurrentLocationName(locationName));
+    }
+  }, [locationName, dispatch]);
 
   // Memoize the initial location to prevent unnecessary re-renders
   const memoizedInitialLocation = useMemo(() => {
