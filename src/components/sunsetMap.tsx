@@ -73,9 +73,13 @@ const SUNSET_SPOT_CACHE_KEY_PREFIX = "sunset-app-spot-cache-v3";
 const SPOT_CACHE_CELL_METERS = 250;
 const METERS_PER_DEGREE_LAT = 111_320;
 const MAP_SETTLE_DELAY_MS = 900;
-// Keep the current recommendations while at least this FRACTION of them remains
-// visible in the viewport; re-fetch once most have panned off the map.
-const RECOMMENDATION_COVERAGE_RATIO = 0.5;
+// Recompute based on the recommendation CLUSTER, not raw viewport counts.
+// The "core" is the tight circle around the recs' centroid holding this
+// fraction of them (outliers trimmed)...
+const CORE_CLUSTER_FRACTION = 0.8;
+// ...and we keep the current recs while at least this fraction of that core is
+// still inside the viewport — i.e. recompute once >30% of the core has left.
+const CORE_RETENTION_THRESHOLD = 0.7;
 // Selected spot marker sits above all others so its detail card isn't covered.
 const SELECTED_SPOT_Z_INDEX = 1000;
 
@@ -373,20 +377,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     lng1: number,
     lat2: number,
     lng2: number,
-  ) => {
-    const R = 6371e3; // Earth's radius in meters
-    const φ1 = (lat1 * Math.PI) / 180; // φ, λ in radians
-    const φ2 = (lat2 * Math.PI) / 180;
-    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-    const Δλ = ((lng2 - lng1) * Math.PI) / 180;
-
-    const a =
-      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c; // in metres
-  };
+  ) => haversineMeters(lat1, lng1, lat2, lng2);
 
   // Handle map clicks to add/remove markers
   const handleMapClick = useCallback(
@@ -470,18 +461,22 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       }
 
       mapSettleTimeoutRef.current = setTimeout(() => {
-        // Re-fetch purely on viewport coverage: keep the current recommendations
-        // while at least half of them remain inside the viewport, and re-fetch
-        // once most have panned off the map. Zoom-aware where a fixed distance
-        // is not, and no separate move threshold to fight it.
-        const currentSpots = sunsetSpotsRef.current;
-        if (
-          nextBounds &&
-          currentSpots.length > 0 &&
-          countSpotsInBounds(currentSpots, nextBounds) >=
-            currentSpots.length * RECOMMENDATION_COVERAGE_RATIO
-        ) {
-          return;
+        // Recompute based on the recommendation CLUSTER, not the raw viewport
+        // count. Establish the core circle that holds CORE_CLUSTER_FRACTION of
+        // the recs (outliers trimmed), then keep the current recs while at least
+        // CORE_RETENTION_THRESHOLD of that core is still inside the viewport.
+        // This accounts for how the recs actually cluster — panning off the
+        // dense area re-fetches even if a stray outlier lingers in view.
+        const core = nextBounds
+          ? computeCoreCluster(sunsetSpotsRef.current, CORE_CLUSTER_FRACTION)
+          : null;
+        if (core && nextBounds) {
+          const retainedInView = core.spots.filter((spot) =>
+            pointInBounds(spot.latitude, spot.longitude, nextBounds),
+          ).length;
+          if (retainedInView / core.count >= CORE_RETENTION_THRESHOLD) {
+            return;
+          }
         }
 
         setQueryCenter(nextCenter);
@@ -1317,20 +1312,81 @@ function getSpotMarkerLabel(spot: SunsetSpot): string {
   return normalizeFilterLabel(sceneQuality || kind);
 }
 
-// How many current recommendations fall inside the map's visible bounds.
-// Longitude may wrap the antimeridian (west > east), so handle both cases.
-function countSpotsInBounds(
-  spots: SunsetSpot[],
-  bounds: { north: number; south: number; east: number; west: number },
+function haversineMeters(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
 ): number {
-  return spots.filter((spot) => {
-    if (spot.latitude > bounds.north || spot.latitude < bounds.south) {
-      return false;
-    }
-    return bounds.west <= bounds.east
-      ? spot.longitude >= bounds.west && spot.longitude <= bounds.east
-      : spot.longitude >= bounds.west || spot.longitude <= bounds.east;
-  }).length;
+  const R = 6371e3; // Earth's radius in metres
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Is a point inside the map's visible bounds? Longitude may wrap the
+// antimeridian (west > east), so handle both cases.
+function pointInBounds(
+  latitude: number,
+  longitude: number,
+  bounds: { north: number; south: number; east: number; west: number },
+): boolean {
+  if (latitude > bounds.north || latitude < bounds.south) {
+    return false;
+  }
+  return bounds.west <= bounds.east
+    ? longitude >= bounds.west && longitude <= bounds.east
+    : longitude >= bounds.west || longitude <= bounds.east;
+}
+
+interface CoreCluster {
+  spots: SunsetSpot[];
+  count: number;
+  centerLat: number;
+  centerLng: number;
+  radiusMeters: number;
+}
+
+// The recommendation "core": the tightest circle around the recs' centroid that
+// still holds `fraction` of them. Trimming the scattered outliers means the
+// re-fetch trigger tracks where the recs actually concentrate, not a spread
+// inflated by one far-flung spot. Returns the core subset + its circle.
+function computeCoreCluster(
+  spots: SunsetSpot[],
+  fraction: number,
+): CoreCluster | null {
+  if (spots.length === 0) {
+    return null;
+  }
+  const centerLat =
+    spots.reduce((sum, spot) => sum + spot.latitude, 0) / spots.length;
+  const centerLng =
+    spots.reduce((sum, spot) => sum + spot.longitude, 0) / spots.length;
+  const byDistance = spots
+    .map((spot) => ({
+      spot,
+      distance: haversineMeters(
+        centerLat,
+        centerLng,
+        spot.latitude,
+        spot.longitude,
+      ),
+    }))
+    .sort((a, b) => a.distance - b.distance);
+  const coreCount = Math.max(1, Math.ceil(spots.length * fraction));
+  const core = byDistance.slice(0, coreCount);
+  return {
+    spots: core.map((entry) => entry.spot),
+    count: core.length,
+    centerLat,
+    centerLng,
+    radiusMeters: core[core.length - 1]?.distance ?? 0,
+  };
 }
 
 function getSunsetSpotCacheKey(center: { lat: number; lng: number }): string {
