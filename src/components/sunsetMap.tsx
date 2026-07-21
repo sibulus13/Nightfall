@@ -32,7 +32,6 @@ import {
   Eye,
   Footprints,
   Landmark,
-  Loader2,
   MapPin,
   Mountain,
   Play,
@@ -45,9 +44,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import CelestialIndicators from "./celestialIndicators";
-import PhaseGuide from "./phaseGuide";
+import CyclingLoader from "./cyclingLoader";
+import { PhaseTimeline, type Phase } from "./phaseTimeline";
 import { bearingToCompass } from "~/lib/sunset/bearing";
-import { phaseCardGradient } from "~/lib/sunset/phaseColors";
 import type { SunsetSpot, SunsetSpotResponse } from "~/types/sunsetSpot";
 
 interface SunsetMapProps {
@@ -119,8 +118,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
   const [isLoadingSpots, setIsLoadingSpots] = useState(false);
   const [isRefiningSpots, setIsRefiningSpots] = useState(false);
-  const [spotSource, setSpotSource] =
-    useState<SunsetSpotResponse["source"] | null>(null);
   const [spotError, setSpotError] = useState<string | null>(null);
   const [activeSpotFilters, setActiveSpotFilters] =
     useState<ActiveSpotFilters>({
@@ -128,6 +125,9 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       locationTypes: [],
       features: [],
     });
+  // Phase filter (from the timeline). Kept by key so the map can match on
+  // spot.bestPhase without the label round-trip the pill filters use.
+  const [selectedPhase, setSelectedPhase] = useState<Phase | null>(null);
   const mapSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -153,15 +153,19 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     () => getAvailableSpotFilters(sunsetSpots),
     [sunsetSpots],
   );
-  const filteredSunsetSpots = useMemo(() => {
-    if (!hasActiveSpotFilters(activeSpotFilters)) {
-      return sunsetSpots;
-    }
-
-    return sunsetSpots.filter((spot) =>
-      doesSpotMatchFilters(spot, activeSpotFilters),
-    );
-  }, [activeSpotFilters, sunsetSpots]);
+  // A spot matches when it satisfies the pill filters AND the phase filter
+  // (if one is set). Shared by the map dimming and the "M of N" count.
+  const spotMatchesActiveFilters = useCallback(
+    (spot: SunsetSpot): boolean =>
+      (!hasActiveSpotFilters(activeSpotFilters) ||
+        doesSpotMatchFilters(spot, activeSpotFilters)) &&
+      (selectedPhase === null || spot.bestPhase === selectedPhase),
+    [activeSpotFilters, selectedPhase],
+  );
+  const matchedSpotCount = useMemo(
+    () => sunsetSpots.filter(spotMatchesActiveFilters).length,
+    [sunsetSpots, spotMatchesActiveFilters],
+  );
 
   // Function to get gradient background based on prediction score (matching predictions tab)
   const getScoreGradient = useCallback((score: number) => {
@@ -256,7 +260,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     const candidates = data.candidates.map(normalizeSunsetSpot);
 
     setSunsetSpots(candidates);
-    setSpotSource(data.source);
     setActiveSpotFilters((currentFilters) =>
       pruneActiveSpotFilters(currentFilters, candidates),
     );
@@ -321,12 +324,11 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       setIsLoadingSpots(true);
       setSpotError(null);
 
-      // New location → drop the previous location's spots so every component
-      // (phase guide, spot list, map pins) shows its own loading state instead
-      // of stale recommendations that no longer match where we're searching.
+      // New location → drop the previous location's spots so the card + map
+      // pins show a loading state instead of stale recommendations that no
+      // longer match where we're searching.
       setSunsetSpots([]);
       setSelectedSpotId(null);
-      setSpotSource(null);
       setIsRefiningSpots(false);
 
       // Phase 1 — fast keyword-ranked paint (no terrain).
@@ -354,7 +356,6 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
         if (!fastSucceeded) {
           console.error("Error loading sunset spots:", error);
           setSunsetSpots([]);
-          setSpotSource(null);
           setSelectedSpotId(null);
           setSpotError("Could not load nearby sunset spots.");
         }
@@ -582,37 +583,33 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
         {/* Aggregate banner — once ≥2 markers have predictions */}
         {dayStats && <DayStatsBanner stats={dayStats} />}
 
-        {/* Phase recommendations (output) */}
-        <PhaseGuide
-          spots={sunsetSpots}
-          selectedSpotId={selectedSpotId}
-          onSelectSpot={toggleSelectedSpot}
-          isLoading={isLoadingSpots}
-          isRefining={isRefiningSpots}
-        />
-
-        {/* Browse all nearby spots + filters */}
+        {/* One filter card — phase timeline + location/scene filters. The MAP is
+            the output: matches are highlighted, non-matches dim. */}
         <SunsetSpotsPanel
-          spots={filteredSunsetSpots}
           availableFilters={availableSpotFilters}
           activeFilters={activeSpotFilters}
-          selectedSpotId={selectedSpotId}
+          selectedPhase={selectedPhase}
+          matchCount={matchedSpotCount}
+          totalCount={sunsetSpots.length}
           isLoading={isLoadingSpots}
-          source={spotSource}
+          isRefining={isRefiningSpots}
           error={spotError}
           onToggleFilter={(group, value) => {
             setActiveSpotFilters((currentFilters) =>
               toggleSpotFilter(currentFilters, group, value),
             );
           }}
-          onClearFilters={() =>
+          onTogglePhase={(phase) =>
+            setSelectedPhase((current) => (current === phase ? null : phase))
+          }
+          onClearFilters={() => {
             setActiveSpotFilters({
               phases: [],
               locationTypes: [],
               features: [],
-            })
-          }
-          onSelectSpot={toggleSelectedSpot}
+            });
+            setSelectedPhase(null);
+          }}
         />
       </div>
 
@@ -715,15 +712,14 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
 
             {sunsetSpots.map((spot) => {
               const isSelected = spot.id === selectedSpotId;
-              const matchesActiveFilters =
-                !hasActiveSpotFilters(activeSpotFilters) ||
-                doesSpotMatchFilters(spot, activeSpotFilters);
               // With a spot selected, spotlight just that one; otherwise
-              // spotlight the filter matches. Non-emphasized markers dim (stay
-              // on the map for context) rather than disappear, so you can tell
-              // which spots the filter/selection picked out.
+              // spotlight the filter + phase matches. Non-emphasized markers dim
+              // (stay on the map for context) rather than disappear, so you can
+              // tell which spots the filter/selection picked out.
               const isEmphasized =
-                selectedSpotId !== null ? isSelected : matchesActiveFilters;
+                selectedSpotId !== null
+                  ? isSelected
+                  : spotMatchesActiveFilters(spot);
               const isDimmed = !isEmphasized;
 
               return (
@@ -883,29 +879,32 @@ function SunsetSpotMarker({
 }
 
 function SunsetSpotsPanel({
-  spots,
   availableFilters,
   activeFilters,
-  selectedSpotId,
+  selectedPhase,
+  matchCount,
+  totalCount,
   isLoading,
-  source,
+  isRefining,
   error,
   onToggleFilter,
+  onTogglePhase,
   onClearFilters,
-  onSelectSpot,
 }: {
-  spots: SunsetSpot[];
   availableFilters: ActiveSpotFilters;
   activeFilters: ActiveSpotFilters;
-  selectedSpotId: string | null;
+  selectedPhase: Phase | null;
+  matchCount: number;
+  totalCount: number;
   isLoading: boolean;
-  source: SunsetSpotResponse["source"] | null;
+  isRefining: boolean;
   error: string | null;
   onToggleFilter: (group: SpotFilterGroup, value: string) => void;
+  onTogglePhase: (phase: Phase) => void;
   onClearFilters: () => void;
-  onSelectSpot: (spotId: string) => void;
 }) {
-  const hasFilters = hasActiveSpotFilters(activeFilters);
+  const hasFilters =
+    hasActiveSpotFilters(activeFilters) || selectedPhase !== null;
 
   return (
     <aside className="nf-panel p-3">
@@ -913,17 +912,43 @@ function SunsetSpotsPanel({
         <div>
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             <Camera className="h-4 w-4 text-orange-500" />
-            Recommended spots
+            Best sunset spots
           </h3>
           <p className="text-xs text-muted-foreground">
-            {source === "live-overpass"
-              ? "Filtered from nearby map signals"
-              : source === "mixed"
-                ? "Map signals with local recommendations"
-              : "Local recommendations"}
+            {isLoading
+              ? "Scanning nearby…"
+              : isRefining
+                ? "Refining with terrain…"
+                : hasFilters
+                  ? `${matchCount} of ${totalCount} highlighted on the map`
+                  : `${totalCount} nearby · tap a marker to open it`}
           </p>
         </div>
-        {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={onClearFilters}
+            className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {isLoading && (
+        <div className="mb-3">
+          <CyclingLoader />
+        </div>
+      )}
+
+      <div className="mb-3">
+        <div className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+          Sunset phase
+        </div>
+        <PhaseTimeline
+          selectedPhase={selectedPhase}
+          onSelectPhase={onTogglePhase}
+        />
       </div>
 
       {(availableFilters.locationTypes.length > 0 ||
@@ -943,127 +968,20 @@ function SunsetSpotsPanel({
             activeOptions={activeFilters.features}
             onToggleFilter={onToggleFilter}
           />
-          {hasFilters && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={onClearFilters}
-                className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-              >
-                Clear filters
-              </button>
-            </div>
-          )}
         </div>
       )}
 
       {error && (
-        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
           {error}
         </div>
       )}
 
-      {isLoading && spots.length === 0 && <SunsetSpotLoadingState />}
-
-      <div className="mb-3 max-h-44 space-y-2 overflow-y-auto pr-1">
-        {spots.length === 0 && !isLoading ? (
-          <div className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
-            No recommendations match those filters.
-          </div>
-        ) : (
-          spots.map((spot) => (
-            <button
-              key={spot.id}
-              type="button"
-              onClick={() => onSelectSpot(spot.id)}
-              className={`w-full rounded-md border p-2 text-left transition-colors ${
-                spot.id === selectedSpotId
-                  ? "border-[#a6532d] bg-[#fff4e8] text-[#2b241f] dark:bg-[#33241d] dark:text-[#f7e4d4]"
-                  : "border-[#d9c8b6] bg-white/60 hover:bg-[#f5eee5] dark:border-[#3f3933] dark:bg-white/5 dark:hover:bg-white/10"
-              }`}
-              // Same standardized wash as the phase cards, keyed on best phase.
-              style={{
-                backgroundImage: phaseCardGradient(
-                  spot.bestPhase,
-                  spot.phaseScores[spot.bestPhase],
-                ),
-              }}
-              title={`Show ${spot.name} on the map`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <span className="flex min-w-0 items-start gap-2">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600 text-white">
-                    {(() => {
-                      const SpotIcon = getSpotMarkerIcon(spot);
-                      return <SpotIcon className="h-3.5 w-3.5" aria-hidden="true" />;
-                    })()}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">
-                      {spot.name}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {getSpotMarkerLabel(spot)} · {getPhaseLabel(spot.bestPhase)}
-                    </span>
-                  </span>
-                </span>
-                <span
-                  className="shrink-0 rounded-full border border-[#e3c5b4] bg-white/70 px-2 py-0.5 text-xs font-semibold text-[#6f3a28] dark:border-white/10 dark:bg-white/10 dark:text-[#f0c2b0]"
-                  aria-hidden="true"
-                >
-                  map
-                </span>
-              </div>
-            </button>
-          ))
-        )}
-      </div>
-
-      <div className="rounded-md border border-dashed border-[#dfc7b6] bg-white/45 p-2 text-xs text-muted-foreground dark:border-white/10 dark:bg-white/5">
-        Select a spot to open its map popup. Add promising places from the popup
-        and run predictions when you are ready.
-      </div>
+      <p className="mt-3 rounded-md border border-dashed border-[#dfc7b6] bg-white/45 p-2 text-xs text-muted-foreground dark:border-white/10 dark:bg-white/5">
+        Matches are highlighted on the map — tap a marker to open it, then add
+        promising places to run predictions.
+      </p>
     </aside>
-  );
-}
-
-function SunsetSpotLoadingState() {
-  const loadingSteps = [
-    "Reading golden-hour timing",
-    "Checking horizon and water cues",
-    "Comparing view angles",
-    "Looking for reflection potential",
-    "Ranking nearby recommendations",
-  ];
-  const [stepIndex, setStepIndex] = useState(0);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setStepIndex((currentStepIndex) =>
-        (currentStepIndex + 1) % loadingSteps.length,
-      );
-    }, 1200);
-
-    return () => window.clearInterval(interval);
-  }, [loadingSteps.length]);
-
-  return (
-    <div className="mb-3 rounded-md border border-orange-200 bg-orange-50 p-3">
-      <div className="mb-2 flex items-center gap-2 text-xs font-medium text-orange-950">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        {loadingSteps[stepIndex]}
-      </div>
-      <div className="grid grid-cols-5 gap-1">
-        {loadingSteps.map((step, index) => (
-          <div
-            key={step}
-            className={`h-1 rounded-full ${
-              index <= stepIndex ? "bg-orange-400" : "bg-orange-100"
-            }`}
-          />
-        ))}
-      </div>
-    </div>
   );
 }
 
