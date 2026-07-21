@@ -625,7 +625,10 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
             zoom={currentZoom}
             minZoom={minZoom}
             maxZoom={maxZoom}
-            gestureHandling={"greedy"}
+            // "cooperative": page scroll passes through the map; the map only
+            // zooms on ctrl/⌘ + scroll (or two-finger), so it can't trap the
+            // page scroll. Dragging still pans.
+            gestureHandling={"cooperative"}
             disableDefaultUI={false}
             scrollwheel={true}
             onBoundsChanged={onBoundsChanged}
