@@ -114,3 +114,22 @@ dilutes it — when everything is the hero colour, nothing is.
   low-risk, high-legibility, and reclaims planner viewport space.
 
 _Items above logged 2026-07-20 at session close (post-panel-consolidation)._
+
+## Spot store follow-ups (post spot-persistence)
+
+- **Expired-sweep reaper.** `sunset_spot_sweeps` rows past the 30-day TTL and
+  `sunset_spots` rows on a superseded `SPOT_DATA_VERSION` are never deleted —
+  they just stop matching. Harmless at current volume; wants a daily Vercel cron
+  (`delete from ... where data_version <> $current`) before the table gets large.
+- **Unbounded tile read.** `readSpotsNear` has no `LIMIT`; it is bounded only by
+  how much a sweep found. Dense metros are fine today, but a `limit` + a
+  score-ordered column would make the ceiling explicit.
+- **Background refresh on stale coverage.** Coverage is currently binary: fresh
+  → serve, expired → re-sweep and make the user wait. Serving stale spots
+  immediately and re-sweeping in the background (`waitUntil`) would remove the
+  once-a-month latency spike per tile.
+- **`sunset_spots` has no spatial index.** A btree on `(latitude, longitude)`
+  serves the bounding-box prefilter; PostGIS/geohash would be better if spot
+  volume grows past a few hundred thousand rows.
+
+_Items above logged 2026-07-24 (spot persistence + progressive disclosure)._
