@@ -103,23 +103,45 @@ export function getSpotKey(candidate: SunsetLocationCandidate): string {
 }
 
 /**
+ * The spot store is an optimisation, never a dependency. Discovery worked
+ * without a database before it existed and must keep working if the database
+ * is unreachable — a read failure degrades to a live sweep, a write failure
+ * just means the next request pays for the sweep again.
+ */
+async function withStoreFallback<T>(
+  operation: string,
+  fallback: T,
+  run: () => Promise<T>,
+): Promise<T> {
+  if (!hasNeonDatabase()) {
+    return fallback;
+  }
+
+  try {
+    await ensureNeonAppSchema();
+    return await run();
+  } catch (error) {
+    console.warn(
+      `Spot store ${operation} failed; falling back to live discovery.`,
+      error,
+    );
+    return fallback;
+  }
+}
+
+/**
  * Best sweep covering the tile, terrain-complete or not. Callers decide what a
  * terrain-less sweep is worth: it still spares every discovery API call, so a
  * terrain request upgrades it in place rather than re-sweeping from scratch.
  */
-export async function findSweepCoverage(options: {
+export function findSweepCoverage(options: {
   tile: SpotTile;
   radiusMeters: number;
 }): Promise<SweepCoverage | null> {
-  if (!hasNeonDatabase()) {
-    return null;
-  }
-
-  await ensureNeonAppSchema();
-
-  const sql = getNeonSql();
-  const freshAfter = new Date(Date.now() - SWEEP_TTL_MS).toISOString();
-  const rows = (await sql`
+  return withStoreFallback("coverage lookup", null, async () => {
+    const sql = getNeonSql();
+    const freshAfter = new Date(Date.now() - SWEEP_TTL_MS).toISOString();
+    const rows = (await sql`
     select radius_meters, swept_at, has_terrain
     from sunset_spot_sweeps
     where tile_key = ${options.tile.key}
@@ -129,21 +151,22 @@ export async function findSweepCoverage(options: {
     order by has_terrain desc, radius_meters asc
     limit 1
   `) as Array<{
-    radius_meters: number;
-    swept_at: string;
-    has_terrain: boolean;
-  }>;
-  const row = rows[0];
+      radius_meters: number;
+      swept_at: string;
+      has_terrain: boolean;
+    }>;
+    const row = rows[0];
 
-  if (!row) {
-    return null;
-  }
+    if (!row) {
+      return null;
+    }
 
-  return {
-    radiusMeters: row.radius_meters,
-    sweptAt: new Date(row.swept_at).toISOString(),
-    hasTerrain: row.has_terrain,
-  };
+    return {
+      radiusMeters: row.radius_meters,
+      sweptAt: new Date(row.swept_at).toISOString(),
+      hasTerrain: row.has_terrain,
+    };
+  });
 }
 
 /**
@@ -151,39 +174,40 @@ export async function findSweepCoverage(options: {
  * tile centre). The SQL bounding box is a cheap index-friendly prefilter; the
  * exact circle is applied in memory.
  */
-export async function readSpotsNear(
+export function readSpotsNear(
   center: Coordinate,
   radiusMeters: number,
 ): Promise<StoredSpot[]> {
-  if (!hasNeonDatabase()) {
-    return [];
-  }
+  return withStoreFallback<StoredSpot[]>("spot read", [], async () => {
+    const latitudeDelta = radiusMeters / METERS_PER_DEGREE_LATITUDE;
+    const longitudeDelta =
+      radiusMeters /
+      (METERS_PER_DEGREE_LATITUDE *
+        Math.max(Math.cos((center.latitude * Math.PI) / 180), 0.01));
 
-  await ensureNeonAppSchema();
+    const sql = getNeonSql();
+    const rows = (await sql`
+      select candidate_json, profile_azimuth_deg
+      from sunset_spots
+      where data_version = ${SPOT_DATA_VERSION}
+        and latitude between ${center.latitude - latitudeDelta}
+          and ${center.latitude + latitudeDelta}
+        and longitude between ${center.longitude - longitudeDelta}
+          and ${center.longitude + longitudeDelta}
+    `) as Array<{
+      candidate_json: unknown;
+      profile_azimuth_deg: number | null;
+    }>;
 
-  const latitudeDelta = radiusMeters / METERS_PER_DEGREE_LATITUDE;
-  const longitudeDelta =
-    radiusMeters /
-    (METERS_PER_DEGREE_LATITUDE *
-      Math.max(Math.cos((center.latitude * Math.PI) / 180), 0.01));
-
-  const sql = getNeonSql();
-  const rows = (await sql`
-    select candidate_json, profile_azimuth_deg
-    from sunset_spots
-    where data_version = ${SPOT_DATA_VERSION}
-      and latitude between ${center.latitude - latitudeDelta}
-        and ${center.latitude + latitudeDelta}
-      and longitude between ${center.longitude - longitudeDelta}
-        and ${center.longitude + longitudeDelta}
-  `) as Array<{ candidate_json: unknown; profile_azimuth_deg: number | null }>;
-
-  return rows
-    .map((row) => ({
-      candidate: parseCandidate(row.candidate_json),
-      profileAzimuthDeg: row.profile_azimuth_deg,
-    }))
-    .filter((spot) => getDistanceMeters(center, spot.candidate) <= radiusMeters);
+    return rows
+      .map((row) => ({
+        candidate: parseCandidate(row.candidate_json),
+        profileAzimuthDeg: row.profile_azimuth_deg,
+      }))
+      .filter(
+        (spot) => getDistanceMeters(center, spot.candidate) <= radiusMeters,
+      );
+  });
 }
 
 /**
@@ -191,28 +215,23 @@ export async function readSpotsNear(
  * that lets a later request know this tile is already covered. Written in one
  * transaction so a partially-written sweep can never be reported as covered.
  */
-export async function saveSweep(options: {
+export function saveSweep(options: {
   tile: SpotTile;
   radiusMeters: number;
   hasTerrain: boolean;
   profileAzimuthDeg: number | null;
   candidates: SunsetLocationCandidate[];
 }): Promise<void> {
-  if (!hasNeonDatabase()) {
-    return;
-  }
+  return withStoreFallback("sweep write", undefined, async () => {
+    const sql = getNeonSql();
+    const sweptAt = new Date().toISOString();
+    const spotWrites = options.candidates.map((candidate) =>
+      buildSpotUpsert(sql, candidate, options.profileAzimuthDeg, sweptAt),
+    );
 
-  await ensureNeonAppSchema();
-
-  const sql = getNeonSql();
-  const sweptAt = new Date().toISOString();
-  const spotWrites = options.candidates.map((candidate) =>
-    buildSpotUpsert(sql, candidate, options.profileAzimuthDeg, sweptAt),
-  );
-
-  await sql.transaction([
-    ...spotWrites,
-    sql`
+    await sql.transaction([
+      ...spotWrites,
+      sql`
       insert into sunset_spot_sweeps (
         sweep_key,
         tile_key,
@@ -240,25 +259,25 @@ export async function saveSweep(options: {
           spot_count = excluded.spot_count,
           swept_at = excluded.swept_at
     `,
-  ]);
+    ]);
+  });
 }
 
 /** Writes back re-sampled horizon profiles after an azimuth-drift refresh. */
-export async function saveSpotProfiles(options: {
+export function saveSpotProfiles(options: {
   candidates: SunsetLocationCandidate[];
   profileAzimuthDeg: number;
 }): Promise<void> {
-  if (!hasNeonDatabase() || options.candidates.length === 0) {
-    return;
+  if (options.candidates.length === 0) {
+    return Promise.resolve();
   }
 
-  await ensureNeonAppSchema();
+  return withStoreFallback("profile write", undefined, async () => {
+    const sql = getNeonSql();
 
-  const sql = getNeonSql();
-
-  await sql.transaction(
-    options.candidates.map(
-      (candidate) => sql`
+    await sql.transaction(
+      options.candidates.map(
+        (candidate) => sql`
         update sunset_spots
         set candidate_json = ${JSON.stringify(candidate)},
             profile_azimuth_deg = ${options.profileAzimuthDeg},
@@ -266,8 +285,9 @@ export async function saveSpotProfiles(options: {
         where spot_key = ${getSpotKey(candidate)}
           and data_version = ${SPOT_DATA_VERSION}
       `,
-    ),
-  );
+      ),
+    );
+  });
 }
 
 function buildSpotUpsert(
@@ -310,4 +330,3 @@ function parseCandidate(value: unknown): SunsetLocationCandidate {
     ? (JSON.parse(value) as SunsetLocationCandidate)
     : (value as SunsetLocationCandidate);
 }
-
