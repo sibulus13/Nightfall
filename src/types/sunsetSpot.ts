@@ -74,7 +74,7 @@ export interface SunsetSpotResponse {
     >;
     liveCandidateCount: number;
     validatedCandidateCount: number;
-    cacheStatus: "hit" | "miss";
+    cacheStatus: "hit" | "miss" | "database";
     fallbackReason: string | null;
   };
 }

@@ -34,47 +34,96 @@ The UI uses these tags as filter pills so users can quickly isolate the type of 
 
 ## Cache Strategy
 
-The discovery feature has two cache layers:
+The cache is split by **volatility**, not by storage medium. Recommendations are
+never stored — only the facts they are computed from.
 
-1. Client cache in `localStorage`
-   - Keyed by rounded latitude, rounded longitude, radius, and limit.
-   - TTL: 15 minutes.
-   - Avoids repeat app/API calls when a user moves away and comes back to the same map area.
-
-2. Server memory cache
-   - Same rounded-location strategy.
-   - TTL: 15 minutes.
-   - Avoids repeated Overpass/Wikipedia calls across users hitting the same area during a short window.
-
-This is enough for a POC and protects the free external APIs from bursts.
-
-## Database Upgrade Path
-
-Once the feature is stable, move from process memory to Supabase/Postgres:
-
-```sql
-create table sunset_spot_cache (
-  cache_key text primary key,
-  center_lat numeric not null,
-  center_lon numeric not null,
-  radius_meters int not null,
-  response jsonb not null,
-  expires_at timestamptz not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create index sunset_spot_cache_expires_at_idx
-  on sunset_spot_cache (expires_at);
+```mermaid
+flowchart TD
+    R["Request<br/>lat, lon, radius"] --> T["Snap to 0.05 deg tile"]
+    T --> L1{"Process memory<br/>15 min"}
+    L1 -->|hit| RANK
+    L1 -->|miss| L2{"sunset_spot_sweeps<br/>tile covered, 30 days?"}
+    L2 -->|covered| DB["Read sunset_spots<br/>one indexed query"]
+    L2 -->|cold| SWEEP["Live sweep<br/>Overpass + Places + Wikipedia"]
+    DB --> RANK["rankSunsetLocation<br/>ALWAYS recomputed"]
+    SWEEP --> STORE["Persist spots + sweep receipt"]
+    STORE --> RANK
+    RANK --> OUT["Ranked recommendations"]
 ```
 
-Recommended behavior:
+### What is stored vs. recomputed
 
-- Read cache first.
-- If fresh, return cached recommendations.
-- If stale, return stale data immediately and refresh in the background later.
-- Delete expired rows daily.
-- Keep cache rows anonymous and area-based, not user-specific.
+| Layer | Content | Cost to produce | Changes every | Stored |
+| --- | --- | --- | --- | --- |
+| Spot facts | OSM tags, Places popularity, Wikipedia images | 3 external APIs | Months | Yes — `sunset_spots` |
+| Horizon profiles | Open-Meteo elevation along the sunset azimuth | 1 external API | Season | Yes — with a `profile_azimuth_deg` stamp |
+| Scores, phase fit, golden hour | `rankSunsetLocation` | Local CPU | **Day** | **No — always recomputed** |
+
+Scoring is deliberately excluded. `rankSunsetLocation` reads `new Date()` for
+golden-hour times and the sunset azimuth, so a stored score would be wrong the
+next morning. Recomputing costs nothing and removes a whole class of staleness.
+
+### Invalidation
+
+Three independent triggers, each at the right granularity:
+
+- **Criteria/shape change** — bump `SPOT_DATA_VERSION` in `spotStore.ts`. Older
+  rows and sweeps stop matching, so the next request re-sweeps. Scoring changes
+  need no bump at all; scores are never stored.
+- **Facts age out** — a sweep older than 30 days no longer counts as coverage.
+- **The sun moves** — a stored horizon profile sampled more than 4 degrees off
+  today's sunset azimuth is re-sampled for those spots only, and written back.
+
+### Why sweeps are recorded separately
+
+`sunset_spot_sweeps` is what distinguishes *"this tile has no sunset spots"*
+from *"this tile was never queried"*. Without it, empty areas (ocean, farmland)
+would re-hit Overpass on every single request forever.
+
+### Tiles, not coordinates
+
+Requests snap to a 0.05 degree (~5.5 km) grid and sweeps run from the tile
+centroid with the radius inflated by half a tile diagonal, so any request inside
+the tile is fully covered. The previous key rounded to 3 decimals (~110 m),
+which meant panning a map produced a fresh key — and a fresh set of external
+calls — on nearly every move.
+
+### Client cache
+
+`localStorage`, keyed on a 250 m cell, TTL 15 minutes. Deliberately finer than
+the server tile: it only dedupes near-identical centres so a coverage-triggered
+re-fetch still gets through.
+
+## Progressive Disclosure
+
+The two-phase client load maps onto the two stored layers, so "load more" is
+one real API call rather than a second full sweep.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as Client
+    participant A as API
+    participant D as Postgres
+
+    C->>A: terrain=false
+    A->>D: read spot facts (or sweep + store)
+    A-->>C: foundational set
+    C-->>U: paint markers + "checking terrain for more"
+    C->>A: terrain=true
+    A->>D: read same facts
+    Note over A: only Open-Meteo runs<br/>no Overpass/Places re-fetch
+    A-->>C: refined set
+    C-->>U: merge, fade in new markers
+```
+
+- **Foundational** — ranked on durable place facts alone. Stable, and instant on
+  a covered tile.
+- **Refined** — terrain-backed scores. Merged into the foundational set, never
+  swapped for it, so markers already on screen do not unmount or reorder.
+- New arrivals get `.nf-spot-enter` (420 ms fade + rise, disabled under
+  `prefers-reduced-motion`); the flag clears after the animation so filter and
+  selection re-renders do not replay it.
 
 ## Cost Balance
 

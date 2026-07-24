@@ -44,6 +44,49 @@ async function createNeonAppSchema(): Promise<void> {
     )
   `;
 
+  // Durable spot catalogue: the expensive, slow-moving half of discovery
+  // (Overpass tags, Places popularity, Wikipedia images, horizon profiles).
+  // Scores are never stored here — they are recomputed per request because
+  // golden-hour times and the sunset azimuth change daily.
+  await sql`
+    create table if not exists sunset_spots (
+      spot_key text primary key,
+      latitude double precision not null,
+      longitude double precision not null,
+      candidate_json jsonb not null,
+      data_version integer not null,
+      profile_azimuth_deg double precision,
+      refreshed_at timestamptz not null default now()
+    )
+  `;
+
+  // One row per completed area sweep. Without this we cannot tell "this tile
+  // has no sunset spots" from "this tile was never queried", and every empty
+  // area would re-hit Overpass forever.
+  await sql`
+    create table if not exists sunset_spot_sweeps (
+      sweep_key text primary key,
+      tile_key text not null,
+      center_lat double precision not null,
+      center_lon double precision not null,
+      radius_meters integer not null,
+      data_version integer not null,
+      has_terrain boolean not null default false,
+      spot_count integer not null default 0,
+      swept_at timestamptz not null default now()
+    )
+  `;
+
+  await sql`
+    create index if not exists sunset_spots_lat_lon_idx
+    on sunset_spots(latitude, longitude)
+  `;
+
+  await sql`
+    create index if not exists sunset_spot_sweeps_tile_idx
+    on sunset_spot_sweeps(tile_key, data_version, radius_meters)
+  `;
+
   await sql`
     create table if not exists app_users (
       id uuid primary key default gen_random_uuid(),
