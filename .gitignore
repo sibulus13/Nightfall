@@ -48,3 +48,6 @@ yarn-error.log*
 .claude
 # local session memory (not app code)
 .remember/
+
+.vercel
+.env*
