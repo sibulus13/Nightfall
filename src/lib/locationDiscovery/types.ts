@@ -135,7 +135,11 @@ export interface DiscoverySearchDiagnostics {
   passesTried: DiscoveryPassName[];
   liveCandidateCount: number;
   validatedCandidateCount: number;
-  cacheStatus: "hit" | "miss";
+  /**
+   * `hit` = process memory, `database` = durable spot store (external sources
+   * already paid for), `miss` = a live sweep was run.
+   */
+  cacheStatus: "hit" | "miss" | "database";
   fallbackReason: string | null;
 }
 

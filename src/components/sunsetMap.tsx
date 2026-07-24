@@ -93,6 +93,16 @@ const CORE_CLUSTER_FRACTION = 0.8;
 const CORE_RETENTION_THRESHOLD = 0.78;
 // Selected spot marker sits above all others so its detail card isn't covered.
 const SELECTED_SPOT_Z_INDEX = 1000;
+// Must match the .nf-spot-enter animation duration in globals.css — the flag is
+// cleared after this so filter/selection re-renders don't replay the fade.
+const SPOT_ENTER_ANIMATION_MS = 420;
+
+/**
+ * `replace` swaps the whole set (a new search area, or a cache hit).
+ * `merge` layers the refined pass on top of the foundational one, so extra
+ * recommendations appear additively instead of re-rendering the map.
+ */
+type SpotApplyMode = "replace" | "merge";
 
 interface SunsetSpotCacheEntry {
   expiresAt: number;
@@ -126,6 +136,9 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
   const [isLoadingSpots, setIsLoadingSpots] = useState(false);
   const [isRefiningSpots, setIsRefiningSpots] = useState(false);
+  const [enteringSpotIds, setEnteringSpotIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [spotError, setSpotError] = useState<string | null>(null);
   const [activeSpotFilters, setActiveSpotFilters] =
     useState<ActiveSpotFilters>({
@@ -287,24 +300,61 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
     }
   }, [initialLocation]);
 
-  const applySunsetSpotResponse = useCallback((data: SunsetSpotResponse) => {
-    const candidates = data.candidates.map(normalizeSunsetSpot);
+  const applySunsetSpotResponse = useCallback(
+    (data: SunsetSpotResponse, mode: SpotApplyMode = "replace") => {
+      const incoming = data.candidates.map(normalizeSunsetSpot);
+      const currentSpots = sunsetSpotsRef.current;
+      // Progressive disclosure: the refined pass adds to the foundational set
+      // rather than swapping it out. Spots already on screen keep their marker
+      // (refreshed with the refined scores); genuinely new spots are appended
+      // and flagged so they can fade in.
+      const nextSpots =
+        mode === "merge" ? mergeSunsetSpots(currentSpots, incoming) : incoming;
 
-    setSunsetSpots(candidates);
-    setActiveSpotFilters((currentFilters) =>
-      pruneActiveSpotFilters(currentFilters, candidates),
-    );
-    setSelectedSpotId((currentSelectedSpotId) => {
-      if (
-        currentSelectedSpotId &&
-        candidates.some((spot) => spot.id === currentSelectedSpotId)
-      ) {
-        return currentSelectedSpotId;
+      if (mode === "merge") {
+        const currentIds = new Set(currentSpots.map((spot) => spot.id));
+        const arrivingIds = incoming
+          .filter((spot) => !currentIds.has(spot.id))
+          .map((spot) => spot.id);
+
+        if (arrivingIds.length > 0) {
+          setEnteringSpotIds(new Set(arrivingIds));
+        }
       }
 
-      return null;
-    });
-  }, []);
+      sunsetSpotsRef.current = nextSpots;
+      setSunsetSpots(nextSpots);
+      setActiveSpotFilters((currentFilters) =>
+        pruneActiveSpotFilters(currentFilters, nextSpots),
+      );
+      setSelectedSpotId((currentSelectedSpotId) => {
+        if (
+          currentSelectedSpotId &&
+          nextSpots.some((spot) => spot.id === currentSelectedSpotId)
+        ) {
+          return currentSelectedSpotId;
+        }
+
+        return null;
+      });
+    },
+    [],
+  );
+
+  // Clear the enter flags once the animation has played, so later re-renders
+  // (filter toggles, selection) don't replay it.
+  useEffect(() => {
+    if (enteringSpotIds.size === 0) {
+      return;
+    }
+
+    const timeout = setTimeout(
+      () => setEnteringSpotIds(new Set()),
+      SPOT_ENTER_ANIMATION_MS,
+    );
+
+    return () => clearTimeout(timeout);
+  }, [enteringSpotIds]);
 
   useEffect(() => {
     const center = queryCenter;
@@ -359,15 +409,18 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
       // pins show a loading state instead of stale recommendations that no
       // longer match where we're searching.
       setSunsetSpots([]);
+      sunsetSpotsRef.current = [];
       setSelectedSpotId(null);
       setIsRefiningSpots(false);
+      setEnteringSpotIds(new Set());
 
-      // Phase 1 — fast keyword-ranked paint (no terrain).
+      // Phase 1 — the foundational set: ranked on durable place facts alone
+      // (no terrain), so it is stable and paints as soon as it lands.
       let fastSucceeded = false;
       try {
         const fast = await fetchSpots(false);
         if (signal.aborted) return;
-        applySunsetSpotResponse(fast);
+        applySunsetSpotResponse(fast, "replace");
         setIsLoadingSpots(false);
         setIsRefiningSpots(true);
         fastSucceeded = true;
@@ -376,12 +429,13 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
         // fall through to the full request as the primary attempt
       }
 
-      // Phase 2 — terrain-refined scores; caches the full result.
+      // Phase 2 — terrain-refined scores, merged into the foundational set so
+      // additional spots fade in rather than replacing what is already shown.
       try {
         const full = await fetchSpots(true);
         if (signal.aborted) return;
         setCachedSunsetSpotResponse(cacheKey, full);
-        applySunsetSpotResponse(full);
+        applySunsetSpotResponse(full, fastSucceeded ? "merge" : "replace");
       } catch (error) {
         if (signal.aborted) return;
         if (!fastSucceeded) {
@@ -773,6 +827,7 @@ const SunsetMap: React.FC<SunsetMapProps> = ({
                     spot={spot}
                     isSelected={isSelected}
                     isDimmed={isDimmed}
+                    isEntering={enteringSpotIds.has(spot.id)}
                     canAddMarker={markers.length < 5}
                     onAddSpot={addSpotToMarkers}
                     // Marker in the upper half of the map → open the popup
@@ -803,6 +858,7 @@ function SunsetSpotMarker({
   spot,
   isSelected,
   isDimmed,
+  isEntering,
   canAddMarker,
   onAddSpot,
   openDownward,
@@ -810,6 +866,8 @@ function SunsetSpotMarker({
   spot: SunsetSpot;
   isSelected: boolean;
   isDimmed: boolean;
+  /** Arrived with the refined pass — fades up instead of popping in. */
+  isEntering: boolean;
   canAddMarker: boolean;
   onAddSpot: (spot: SunsetSpot) => void;
   openDownward: boolean;
@@ -822,7 +880,7 @@ function SunsetSpotMarker({
     <div
       className={`relative flex flex-col items-center transition-opacity duration-300 ${
         isDimmed ? "opacity-30 hover:opacity-100" : "opacity-100"
-      }`}
+      } ${isEntering ? "nf-spot-enter" : ""}`}
     >
       <div
         className={`flex h-10 w-10 items-center justify-center rounded-full border-2 bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600 text-white shadow-lg transition-transform ${
@@ -950,14 +1008,23 @@ function SunsetSpotsPanel({
               {locationName ? `Best sunset spots · ${locationName}` : "Best sunset spots"}
             </span>
           </h3>
-          <p className="text-xs text-muted-foreground">
-            {isLoading
-              ? "Scanning nearby…"
-              : isRefining
-                ? "Refining with terrain…"
-                : hasFilters
-                  ? `${matchCount} of ${totalCount} highlighted on the map`
-                  : `${totalCount} nearby · tap a marker to open it`}
+          {/* While refining, keep the count of what is already usable and say
+              more is coming — the foundational set is not a loading state. */}
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {isLoading ? (
+              "Scanning nearby…"
+            ) : isRefining ? (
+              <>
+                <span className="nf-pulse-dot" aria-hidden="true" />
+                <span>
+                  {totalCount} nearby · checking terrain for more
+                </span>
+              </>
+            ) : hasFilters ? (
+              `${matchCount} of ${totalCount} highlighted on the map`
+            ) : (
+              `${totalCount} nearby · tap a marker to open it`
+            )}
           </p>
         </div>
         {hasFilters && (
@@ -1258,6 +1325,33 @@ function normalizeFilterLabel(value: string): string {
     .trim()
     .replace(/\s+/g, " ")
     .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+/**
+ * Unions the refined pass into the spots already on screen. Existing spots are
+ * updated in place (refined scores, terrain-backed badges) so their marker
+ * never unmounts; spots the refined pass no longer returns are kept rather than
+ * yanked off the map mid-session.
+ */
+function mergeSunsetSpots(
+  currentSpots: SunsetSpot[],
+  incomingSpots: SunsetSpot[],
+): SunsetSpot[] {
+  // NB: `Map` here is the google-maps component, not the global — key by record.
+  const incomingById: Record<string, SunsetSpot> = {};
+  incomingSpots.forEach((spot) => {
+    incomingById[spot.id] = spot;
+  });
+
+  const updatedCurrent = currentSpots.map(
+    (spot) => incomingById[spot.id] ?? spot,
+  );
+  const currentIds = new Set(currentSpots.map((spot) => spot.id));
+
+  return [
+    ...updatedCurrent,
+    ...incomingSpots.filter((spot) => !currentIds.has(spot.id)),
+  ];
 }
 
 function normalizeSunsetSpot(spot: SunsetSpot): SunsetSpot {

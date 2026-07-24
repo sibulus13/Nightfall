@@ -249,7 +249,7 @@ const getSunPosition = getPosition as (
   longitude: number,
 ) => { azimuth: number };
 
-function getSunsetAzimuthDegrees(origin: Coordinate): number {
+export function getSunsetAzimuthDegrees(origin: Coordinate): number {
   // Reference date is fine — the sunset azimuth moves slowly and horizon
   // geometry is static; we only need the compass direction to sample along.
   const times = getSunsetTimes(new Date(), origin.latitude, origin.longitude);
